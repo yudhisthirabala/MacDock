@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l src/dock/*.cpp src/dock/*.h src/menubar/*.cpp src/menubar/*.h src/system/*.cpp src/system/*.h src/config/*.cpp src/config/*.h)",
+      "Bash(cmake --version)",
+      "Bash(where cl.exe)",
+      "Bash(rm -rf build)",
+      "Bash('C:/Program Files/Microsoft Visual Studio/18/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe' -S . -B build -A x64 -DBUILD_TESTS=ON)",
+      "Bash('C:/Program Files/Microsoft Visual Studio/18/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe' --build build --config Release)",
+      "Bash(taskkill /IM macOSWin.exe /F)",
+      "Bash(cmd.exe //C \"taskkill /IM macOSWin.exe /F\")",
+      "Bash(mkdir -p \"C:/temp\")",
+      "Bash('C:/Program Files/Microsoft Visual Studio/18/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe' --build build --config Release --target RUN_TESTS)"
+    ]
+  }
+}

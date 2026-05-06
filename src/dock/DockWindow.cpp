@@ -439,15 +439,25 @@ void DockWindow::RenderDComp()
 
         const int n = static_cast<int>(m_icons.size());
 
-        // Seelen-style rounded dock pill behind the icons.
-        if (n > 0 && !m_flashActive)
+        // Seelen-style rounded dock pill — always drawn so the dock is visible
+        // even when empty (serves as drop target and visual indicator).
+        if (!m_flashActive)
         {
-            RECT first = m_icons.front()->GetBounds();
-            RECT last  = m_icons.back()->GetBounds();
             int pillPadX = S(ICON_PADDING) / 2;
             int pillPadY = S(6);
-            int pillL = first.left  - pillPadX;
-            int pillR = last.right  + pillPadX;
+            int pillL, pillR;
+            if (n > 0)
+            {
+                RECT first = m_icons.front()->GetBounds();
+                RECT last  = m_icons.back()->GetBounds();
+                pillL = first.left  - pillPadX;
+                pillR = last.right  + pillPadX;
+            }
+            else
+            {
+                pillL = pillPadX;
+                pillR = w - pillPadX;
+            }
             int pillT = (S(ICON_BOTTOM_Y) - S(ICON_SIZE)) - pillPadY;
             int pillB = S(ICON_BOTTOM_Y) + pillPadY;
             float radius = (pillB - pillT) / 2.0f;
@@ -463,11 +473,6 @@ void DockWindow::RenderDComp()
                         radius * 2, radius * 2,  90.0f, 90.0f);
             path.CloseFigure();
 
-            // Translucent charcoal pill. The DWMSBT_TRANSIENTWINDOW acrylic
-            // composes the blurred desktop behind the full window; our semi-opaque
-            // pill sits on top of that acrylic backdrop, giving frosted glass.
-            // Color values are premultiplied-compatible because they are very dark
-            // (approx same as previous UpdateLayeredWindow rendering).
             Gdiplus::SolidBrush body(Gdiplus::Color(150, 24, 24, 28));
             g.FillPath(&body, &path);
 

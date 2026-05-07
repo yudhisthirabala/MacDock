@@ -112,9 +112,12 @@ private:
     static constexpr int DOT_RADIUS = 2;
     static constexpr int DOT_OFFSET = 5;
 
-    // Tooltip state
-    HWND m_tooltip = nullptr;
-    int  m_hoveredIndex = -1;
+    // Tooltip: custom layered popup window (macOS-style label above icon)
+    HWND m_tooltipWnd    = nullptr;
+    int  m_hoveredIndex  = -1;
+    Composition::DCompWindow m_tooltipDcomp;
+    void ShowTooltip(int iconIndex);
+    void HideTooltip();
 
     // Bounce animation state (icon bounces on launch)
     int   m_bounceIndex     = -1;

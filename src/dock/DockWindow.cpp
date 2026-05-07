@@ -14,7 +14,6 @@
 #include <shlobj.h>
 #include <shobjidl.h>
 #include <commoncontrols.h>
-#include <commctrl.h>    // tooltip control
 #include <windowsx.h>   // GET_X_LPARAM / GET_Y_LPARAM
 #include <gdiplus.h>
 #include <algorithm>
@@ -40,7 +39,8 @@ DockWindow::DockWindow(HINSTANCE hInstance)
 DockWindow::~DockWindow()
 {
     m_dcomp.Release();
-    if (m_tooltip) DestroyWindow(m_tooltip);
+    m_tooltipDcomp.Release();
+    if (m_tooltipWnd) DestroyWindow(m_tooltipWnd);
     if (m_hwnd)
     {
         RevokeDragDrop(m_hwnd);
@@ -107,16 +107,26 @@ bool DockWindow::Create()
 
     SetTimer(m_hwnd, TIMER_PROCESS_MONITOR, PROCESS_POLL_MS, nullptr);
 
-    // Tooltip for showing app names on hover (macOS-style label above icon)
-    m_tooltip = CreateWindowExW(
-        WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr,
-        WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP,
-        0, 0, 0, 0, m_hwnd, nullptr, m_hInstance, nullptr);
-    if (m_tooltip)
+    // Tooltip: custom layered popup (macOS-style dark pill with app name)
     {
-        SendMessageW(m_tooltip, TTM_SETMAXTIPWIDTH, 0, 300);
-        SendMessageW(m_tooltip, TTM_SETDELAYTIME, TTDT_INITIAL, 200);
-        SendMessageW(m_tooltip, TTM_SETDELAYTIME, TTDT_RESHOW, 100);
+        static bool tipClassReg = false;
+        if (!tipClassReg)
+        {
+            WNDCLASSEXW wc = {};
+            wc.cbSize        = sizeof(wc);
+            wc.lpfnWndProc   = DefWindowProcW;
+            wc.hInstance     = m_hInstance;
+            wc.lpszClassName = L"macOSWin_DockTip";
+            wc.hbrBackground = nullptr;
+            RegisterClassExW(&wc);
+            tipClassReg = true;
+        }
+        m_tooltipWnd = CreateWindowExW(
+            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
+            L"macOSWin_DockTip", L"",
+            WS_POPUP,
+            0, 0, 1, 1,
+            nullptr, nullptr, m_hInstance, nullptr);
     }
 
     return true;
@@ -414,6 +424,91 @@ LRESULT CALLBACK DockWindow::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
     }
 }
 
+// ─── Tooltip (macOS-style dark pill above hovered icon) ──────────────────────
+
+void DockWindow::ShowTooltip(int iconIndex)
+{
+    if (!m_tooltipWnd || iconIndex < 0 || iconIndex >= static_cast<int>(m_icons.size()))
+        return;
+
+    const std::wstring& name = m_icons[iconIndex]->GetName();
+    if (name.empty()) { HideTooltip(); return; }
+
+    // Measure text to determine tooltip size
+    HDC screenDC = GetDC(nullptr);
+    Gdiplus::Graphics gMeasure(screenDC);
+    Gdiplus::FontFamily family(L"Segoe UI");
+    float fontSize = 11.0f * m_dpiScale;
+    Gdiplus::Font font(&family, fontSize, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
+    Gdiplus::RectF textBounds;
+    gMeasure.MeasureString(name.c_str(), -1, &font, Gdiplus::PointF(0, 0), &textBounds);
+    ReleaseDC(nullptr, screenDC);
+
+    int padX = S(10);
+    int padY = S(5);
+    int tipW = static_cast<int>(textBounds.Width + 0.5f) + padX * 2;
+    int tipH = static_cast<int>(textBounds.Height + 0.5f) + padY * 2;
+
+    // Position above the icon, centered
+    RECT iconBounds = m_icons[iconIndex]->GetBounds();
+    int iconCenterX = (iconBounds.left + iconBounds.right) / 2;
+    RECT dockRect;
+    GetWindowRect(m_hwnd, &dockRect);
+    int tipX = dockRect.left + iconCenterX - tipW / 2;
+    int tipY = dockRect.top - tipH - S(4);
+
+    // Init or resize the DComp surface
+    if (m_tooltipDcomp.w == 0)
+        m_tooltipDcomp.Init(m_tooltipWnd, tipW, tipH);
+    else
+        m_tooltipDcomp.Resize(tipW, tipH);
+
+    SetWindowPos(m_tooltipWnd, HWND_TOPMOST, tipX, tipY, tipW, tipH,
+                 SWP_NOACTIVATE);
+
+    // Render the tooltip
+    POINT offset;
+    HDC hdc = m_tooltipDcomp.BeginDraw(&offset);
+    if (hdc)
+    {
+        Gdiplus::Graphics g(hdc);
+        g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+        g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
+
+        g.SetCompositingMode(Gdiplus::CompositingModeSourceCopy);
+        g.Clear(Gdiplus::Color(0, 0, 0, 0));
+        g.SetCompositingMode(Gdiplus::CompositingModeSourceOver);
+
+        float r = static_cast<float>(S(6));
+        Gdiplus::GraphicsPath path;
+        path.AddArc(0.0f, 0.0f, r * 2, r * 2, 180.0f, 90.0f);
+        path.AddArc(static_cast<float>(tipW) - r * 2, 0.0f, r * 2, r * 2, 270.0f, 90.0f);
+        path.AddArc(static_cast<float>(tipW) - r * 2, static_cast<float>(tipH) - r * 2, r * 2, r * 2, 0.0f, 90.0f);
+        path.AddArc(0.0f, static_cast<float>(tipH) - r * 2, r * 2, r * 2, 90.0f, 90.0f);
+        path.CloseFigure();
+
+        Gdiplus::SolidBrush bg(Gdiplus::Color(220, 30, 30, 34));
+        g.FillPath(&bg, &path);
+
+        Gdiplus::SolidBrush fg(Gdiplus::Color(255, 245, 245, 247));
+        Gdiplus::StringFormat sf;
+        sf.SetAlignment(Gdiplus::StringAlignmentCenter);
+        sf.SetLineAlignment(Gdiplus::StringAlignmentCenter);
+        Gdiplus::RectF box(0.0f, 0.0f, static_cast<float>(tipW), static_cast<float>(tipH));
+        g.DrawString(name.c_str(), -1, &font, box, &sf, &fg);
+    }
+    m_tooltipDcomp.EndDraw();
+    m_tooltipDcomp.Commit();
+
+    ShowWindow(m_tooltipWnd, SW_SHOWNOACTIVATE);
+}
+
+void DockWindow::HideTooltip()
+{
+    if (m_tooltipWnd)
+        ShowWindow(m_tooltipWnd, SW_HIDE);
+}
+
 // ─── OnPaint / RenderDComp ────────────────────────────────────────────────────
 
 void DockWindow::OnPaint()
@@ -627,7 +722,6 @@ void DockWindow::OnMouseMove(int x, int y)
     InvalidateRect(m_hwnd, nullptr, FALSE);
 
     // Tooltip: detect which icon is hovered
-    if (m_tooltip)
     {
         int newHover = -1;
         POINT p { x, y };
@@ -638,25 +732,11 @@ void DockWindow::OnMouseMove(int x, int y)
         }
         if (newHover != m_hoveredIndex)
         {
-            // Remove old tool
-            TOOLINFOW ti = {};
-            ti.cbSize = sizeof(ti);
-            ti.hwnd   = m_hwnd;
-            ti.uId    = 1;
-            SendMessageW(m_tooltip, TTM_DELTOOLW, 0, reinterpret_cast<LPARAM>(&ti));
-
             m_hoveredIndex = newHover;
             if (newHover >= 0)
-            {
-                RECT b = m_icons[newHover]->GetBounds();
-                ti.uFlags   = TTF_SUBCLASS;
-                ti.hwnd     = m_hwnd;
-                ti.uId      = 1;
-                ti.rect     = b;
-                ti.lpszText = const_cast<LPWSTR>(m_icons[newHover]->GetName().c_str());
-                SendMessageW(m_tooltip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&ti));
-                SendMessageW(m_tooltip, TTM_TRACKACTIVATE, TRUE, reinterpret_cast<LPARAM>(&ti));
-            }
+                ShowTooltip(newHover);
+            else
+                HideTooltip();
         }
     }
 
@@ -675,14 +755,10 @@ void DockWindow::OnMouseMove(int x, int y)
 void DockWindow::OnMouseLeave()
 {
     m_mouseTracking = false;
-    if (m_tooltip && m_hoveredIndex >= 0)
+    if (m_hoveredIndex >= 0)
     {
-        TOOLINFOW ti = {};
-        ti.cbSize = sizeof(ti);
-        ti.hwnd   = m_hwnd;
-        ti.uId    = 1;
-        SendMessageW(m_tooltip, TTM_DELTOOLW, 0, reinterpret_cast<LPARAM>(&ti));
         m_hoveredIndex = -1;
+        HideTooltip();
     }
 }
 

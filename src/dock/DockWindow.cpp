@@ -164,7 +164,7 @@ void DockWindow::Show()
     ShowWindow(m_hwnd, SW_SHOWNOACTIVATE);
 
     m_entranceActive  = true;
-    m_entranceStartMs = GetTickCount();
+    m_entranceStartMs = 0;  // set on first timer tick
     RenderDComp();
     SetTimer(m_hwnd, TIMER_ENTRANCE, 16, nullptr);
 }
@@ -1060,11 +1060,8 @@ void DockWindow::OnTimer(WPARAM timerId)
     }
     else if (timerId == TIMER_ENTRANCE)
     {
-        // Ease-out quadratic slide-up: p(t) = start + dist*(2t/T - t²/T²)
-        // With DComp rendering, the surface content is already committed — only
-        // the window position needs updating each tick (fast SetWindowPos call,
-        // no GDI re-render required). This avoids the UpdateLayeredWindow
-        // per-frame cost that caused the old entrance animation to fail.
+        if (m_entranceStartMs == 0)
+            m_entranceStartMs = GetTickCount();
         DWORD elapsed = GetTickCount() - m_entranceStartMs;
         if (elapsed >= ENTRANCE_DURATION_MS)
         {

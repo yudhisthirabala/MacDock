@@ -177,9 +177,11 @@ void DockWindow::Reposition()
     const int iconSize = S(ICON_SIZE);
     const int iconPad  = S(ICON_PADDING);
 
+    // Extra width for the separator line at the end of the dock
+    int sepExtra = (count > 0) ? iconPad / 2 : 0;
     int dockW = (count == 0)
         ? S(DOCK_EMPTY_WIDTH)
-        : (count + 1) * iconPad + count * iconSize;
+        : (count + 1) * iconPad + count * iconSize + sepExtra;
 
     SIZE      mon     = Composition::GetPrimaryMonitorSize();
     const int screenW = mon.cx;
@@ -670,32 +672,16 @@ void DockWindow::RenderDComp()
                 }
             }
 
-            // Separator: thin vertical line between the last non-running
-            // icon and the first running icon (macOS-style divider).
+            // Separator: always draw a thin vertical line after the last
+            // pinned icon (macOS-style divider at end of dock).
+            if (n >= 1)
             {
-                int lastNonRunning = -1;
-                int firstRunning   = -1;
-                for (int i = 0; i < n; ++i)
-                {
-                    if (m_icons[i]->IsRunning())
-                    {
-                        if (firstRunning < 0) firstRunning = i;
-                    }
-                    else
-                    {
-                        lastNonRunning = i;
-                    }
-                }
-                if (lastNonRunning >= 0 && firstRunning >= 0 && firstRunning > lastNonRunning)
-                {
-                    RECT bL = m_icons[lastNonRunning]->GetBounds();
-                    RECT bR = m_icons[firstRunning]->GetBounds();
-                    float sepX = static_cast<float>(bL.right + bR.left) / 2.0f;
-                    float sepT = static_cast<float>(S(ICON_BOTTOM_Y) - S(ICON_SIZE) + S(4));
-                    float sepB = static_cast<float>(S(ICON_BOTTOM_Y) - S(4));
-                    Gdiplus::Pen sepPen(Gdiplus::Color(80, 255, 255, 255), 1.0f);
-                    g.DrawLine(&sepPen, sepX, sepT, sepX, sepB);
-                }
+                RECT lastB = m_icons.back()->GetBounds();
+                float sepX = static_cast<float>(lastB.right + S(ICON_PADDING) / 2);
+                float sepT = static_cast<float>(S(ICON_BOTTOM_Y) - S(ICON_SIZE) + S(6));
+                float sepB = static_cast<float>(S(ICON_BOTTOM_Y) - S(6));
+                Gdiplus::Pen sepPen(Gdiplus::Color(80, 255, 255, 255), 1.0f);
+                g.DrawLine(&sepPen, sepX, sepT, sepX, sepB);
             }
         }
     }  // g destroyed here — required before EndDraw

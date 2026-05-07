@@ -728,6 +728,43 @@ Bala ran the build mid-session. Multiple Phase 6 features failed on their Win11 
 
 ---
 
+## Session 014 — 2026-05-07
+
+**Type:** Bug Fix
+**Participants:** Bala, Claude Code
+**Duration:** Single conversation
+**Phase at start:** Phase 6 In Progress (v0.6.0 shipped; DComp rewrite from Session 013 reverted)
+**Phase at end:** Phase 6 In Progress — dock visibility bug fixed and verified
+
+### What Was Done
+- **Full project summary** provided to Bala covering all 13 prior sessions.
+- **Diagnosed dock invisibility bug:** The `UpdateLayeredWindow` per-pixel-alpha rendering path produces an entirely transparent surface when no icons are pinned. The pill background was only drawn when `n > 0` (`m_icons.size() > 0`). With zero icons, every pixel had alpha=0 — making the dock completely invisible. The menu bar was unaffected because it always draws a full gradient background.
+- **Fixed `DockWindow::RenderDComp()`:** Changed pill drawing condition from `if (n > 0 && !m_flashActive)` to `if (!m_flashActive)`. When empty, the pill spans the full dock width; when icons are present it wraps around them as before.
+- **Cleaned up stale DComp comments** in `DockWindow.cpp` and `DockWindow.h` that still referenced `WS_EX_NOREDIRECTIONBITMAP` / DirectComposition despite the revert to layered windows.
+- **Git housekeeping:** configured git identity, committed fix to `main`, pushed to GitHub, deleted orphan worktree and `claude/exciting-allen-2d3322` branch.
+- **Verified by Bala:** dock pill visible, drag-to-pin working, everything functional.
+
+### Files Changed
+- `src/dock/DockWindow.cpp` (pill always-draw fix)
+
+### Decisions Made
+- None.
+
+### Blockers / Notes
+- None. Fix verified working by Bala.
+
+### Next Session Should
+1. Continue **Phase 6 polish** — candidate work:
+   - DirectComposition acrylic/blur (DEC-027 was reverted; needs fresh approach)
+   - Dock entrance slide-up animation
+   - Real Apple logo asset
+   - Tray icon asset
+   - Config location (`%APPDATA%` vs next-to-exe)
+   - Run-at-Windows-startup decision (long deferred)
+2. Update `docs/TESTING.md` with Phase 6 test cases.
+
+---
+
 *Template for future sessions:*
 ```
 ## Session XXX — YYYY-MM-DD

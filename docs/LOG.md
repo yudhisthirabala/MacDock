@@ -5,6 +5,23 @@
 
 ---
 
+## 2026-05-07 | Session 014 — Dock invisibility fix
+
+### Root cause
+With `UpdateLayeredWindow(AC_SRC_ALPHA)`, pixels with alpha=0 are invisible. The dock pill was only drawn when `m_icons.size() > 0`. An empty dock (no `pinned_apps.json` or empty config) produced an entirely transparent surface — the dock window existed but was invisible. The menu bar was unaffected because it always draws a full gradient.
+
+### Fix
+Changed `if (n > 0 && !m_flashActive)` to `if (!m_flashActive)` in `RenderDComp()`. Empty dock now shows a pill spanning the full `DOCK_EMPTY_WIDTH`. With icons, the pill wraps around them as before.
+
+### Open items carried forward
+- [ ] Phase 6: DirectComposition acrylic/blur (fresh approach needed — DEC-027 DComp path reverted)
+- [ ] Phase 6: Dock entrance slide-up animation
+- [ ] Phase 6: Real Apple logo asset, tray icon asset
+- [ ] Config location (`%APPDATA%` vs next-to-exe)
+- [ ] Run-at-Windows-startup decision (long deferred)
+
+---
+
 ## 2026-04-18 | Session 013 — DEC-027 DirectComposition rewrite
 
 ### Architecture

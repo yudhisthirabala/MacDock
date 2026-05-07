@@ -61,6 +61,9 @@ private:
     RECT m_playRect = {};
     RECT m_nextRect = {};
 
+    // Widget hit rects (updated each paint, read in OnLButtonUp).
+    WidgetHitRects m_widgetRects = {};
+
     // Now-Playing track text (DEC-024). Written by SMTC worker; read by OnPaint.
     std::mutex   m_nowPlayingMutex;
     std::wstring m_nowPlayingText;

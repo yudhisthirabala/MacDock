@@ -220,10 +220,9 @@ SystemInfoData SystemInfoBar::Fetch()
     return d;
 }
 
-int SystemInfoBar::Render(HDC hdc, RECT barRect, const SystemInfoData& data)
+int SystemInfoBar::Render(HDC hdc, RECT barRect, const SystemInfoData& data,
+                          WidgetHitRects* outRects)
 {
-    // Refresh DPI scale every frame so dragging between monitors at different
-    // scale factors keeps the widgets sized correctly.
     g_scale = GetDpiForSystem() / 96.0f;
 
     Graphics g(hdc);
@@ -233,14 +232,26 @@ int SystemInfoBar::Render(HDC hdc, RECT barRect, const SystemInfoData& data)
     int cy      = (barRect.top + barRect.bottom) / 2;
     int spacing = SI(WIDGET_SPACING);
     int right   = barRect.right - SI(RIGHT_PADDING);
+    int prevRight = right;
 
     // Right-to-left: clock, battery, volume, wifi
-    right = DrawClock(g,   right, cy, data.clock) - spacing;
+    right = DrawClock(g, right, cy, data.clock) - spacing;
+    if (outRects) outRects->clock = { right + spacing, barRect.top, prevRight, barRect.bottom };
+    prevRight = right;
 
     if (data.battery >= 0)
+    {
         right = DrawBattery(g, right, cy, data.battery, data.charging) - spacing;
+        if (outRects) outRects->battery = { right + spacing, barRect.top, prevRight, barRect.bottom };
+        prevRight = right;
+    }
 
     right = DrawVolume(g, right, cy, data.volume, data.volume == 0) - spacing;
-    right = DrawWifi(g,   right, cy, data.wifiConnected, data.wifiQuality) - spacing;
+    if (outRects) outRects->volume = { right + spacing, barRect.top, prevRight, barRect.bottom };
+    prevRight = right;
+
+    right = DrawWifi(g, right, cy, data.wifiConnected, data.wifiQuality) - spacing;
+    if (outRects) outRects->wifi = { right + spacing, barRect.top, prevRight, barRect.bottom };
+
     return right;
 }

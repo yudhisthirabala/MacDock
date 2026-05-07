@@ -108,6 +108,6 @@ private:
     static constexpr UINT_PTR TIMER_ENTRANCE        = 4;
 
     // Running indicator dot dimensions
-    static constexpr int DOT_RADIUS = 3;
-    static constexpr int DOT_OFFSET = 4;
+    static constexpr int DOT_RADIUS = 2;
+    static constexpr int DOT_OFFSET = 5;
 };

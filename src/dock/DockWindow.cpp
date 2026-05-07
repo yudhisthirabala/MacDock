@@ -473,10 +473,10 @@ void DockWindow::RenderDComp()
                         radius * 2, radius * 2,  90.0f, 90.0f);
             path.CloseFigure();
 
-            Gdiplus::SolidBrush body(Gdiplus::Color(150, 24, 24, 28));
+            Gdiplus::SolidBrush body(Gdiplus::Color(130, 22, 22, 26));
             g.FillPath(&body, &path);
 
-            Gdiplus::Pen hilite(Gdiplus::Color(70, 255, 255, 255), 1.0f);
+            Gdiplus::Pen hilite(Gdiplus::Color(40, 255, 255, 255), 0.5f);
             g.DrawPath(&hilite, &path);
         }
 
@@ -506,7 +506,7 @@ void DockWindow::RenderDComp()
             std::sort(order.begin(), order.end(),
                       [&scales](int a, int b){ return scales[a] < scales[b]; });
 
-            Gdiplus::SolidBrush dotBrush(Gdiplus::Color(230, 255, 255, 255));
+            Gdiplus::SolidBrush dotBrush(Gdiplus::Color(200, 255, 255, 255));
 
             for (int idx : order)
             {

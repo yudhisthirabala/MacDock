@@ -8,6 +8,7 @@
 #include "../system/CompositionHelper.h"
 
 #include <gdiplus.h>
+#include <shellapi.h>
 #include <chrono>
 
 #if __has_include(<winrt/Windows.Media.Control.h>)
@@ -80,7 +81,7 @@ bool MenuBarWindow::Create()
     wc.lpfnWndProc   = MenuBarWindow::WndProc;
     wc.hInstance     = m_hInstance;
     wc.lpszClassName = MENUBAR_CLASS_NAME;
-    wc.hCursor       = LoadCursor(nullptr, IDC_HAND);
+    wc.hCursor       = LoadCursor(nullptr, IDC_ARROW);
     wc.hbrBackground = nullptr;
     RegisterClassExW(&wc);
 
@@ -333,9 +334,9 @@ void MenuBarWindow::RenderDComp()
 
         g.SetCompositingMode(CompositingModeSourceOver);
 
-        Pen hilite(Color(36, 255, 255, 255), 1.0f);
+        Pen hilite(Color(30, 255, 255, 255), 1.0f);
         g.DrawLine(&hilite, 0, 0, w, 0);
-        Pen edge(Color(120, 0, 0, 0), 1.0f);
+        Pen edge(Color(60, 0, 0, 0), 1.0f);
         g.DrawLine(&edge, 0, h - 1, w, h - 1);
 
         // Media button rects.
@@ -405,7 +406,7 @@ void MenuBarWindow::RenderDComp()
 
         // Right-side widget cluster (clock, battery, volume, Wi-Fi).
         RECT rc = { 0, 0, w, h };
-        SystemInfoBar::Render(hdc, rc, m_sysInfo);
+        SystemInfoBar::Render(hdc, rc, m_sysInfo, &m_widgetRects);
     }  // g destroyed here — required before EndDraw
 
     m_dcomp.EndDraw();
@@ -425,4 +426,12 @@ void MenuBarWindow::OnLButtonUp(int x, int y)
     if      (PointInRect(x, y, m_prevRect)) SendMediaKey(VK_MEDIA_PREV_TRACK);
     else if (PointInRect(x, y, m_playRect)) SendMediaKey(VK_MEDIA_PLAY_PAUSE);
     else if (PointInRect(x, y, m_nextRect)) SendMediaKey(VK_MEDIA_NEXT_TRACK);
+    else if (PointInRect(x, y, m_widgetRects.wifi))
+        ShellExecuteW(nullptr, L"open", L"ms-settings:network-wifi", nullptr, nullptr, SW_SHOW);
+    else if (PointInRect(x, y, m_widgetRects.volume))
+        ShellExecuteW(nullptr, L"open", L"ms-settings:sound", nullptr, nullptr, SW_SHOW);
+    else if (PointInRect(x, y, m_widgetRects.battery))
+        ShellExecuteW(nullptr, L"open", L"ms-settings:batterysaver", nullptr, nullptr, SW_SHOW);
+    else if (PointInRect(x, y, m_widgetRects.clock))
+        ShellExecuteW(nullptr, L"open", L"ms-settings:dateandtime", nullptr, nullptr, SW_SHOW);
 }

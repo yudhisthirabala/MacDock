@@ -17,6 +17,15 @@ struct SystemInfoData
     std::wstring ssid;        // connected network name
 };
 
+// Hit rects for widget click handling
+struct WidgetHitRects
+{
+    RECT clock   = {};
+    RECT battery = {};
+    RECT volume  = {};
+    RECT wifi    = {};
+};
+
 class SystemInfoBar
 {
 public:
@@ -25,5 +34,6 @@ public:
 
     // Render the system info section into a DC at a given x offset from the right edge
     // Returns the leftmost x used (so the caller can avoid overlap)
-    static int Render(HDC hdc, RECT barRect, const SystemInfoData& data);
+    static int Render(HDC hdc, RECT barRect, const SystemInfoData& data,
+                      WidgetHitRects* outRects = nullptr);
 };

@@ -11,9 +11,9 @@ static bool IsSystemProcess(const std::wstring& exeLower)
     static const wchar_t* skip[] = {
         L"explorer.exe", L"shellexperiencehost.exe", L"searchhost.exe",
         L"startmenuexperiencehost.exe", L"textinputhost.exe",
-        L"applicationframehost.exe", L"systemsettingsbroker.exe",
+        L"systemsettingsbroker.exe",
         L"runtimebroker.exe", L"dwm.exe", L"csrss.exe",
-        L"svchost.exe", L"taskmgr.exe", L"conhost.exe",
+        L"svchost.exe", L"conhost.exe",
         L"searchui.exe", L"cortana.exe", L"lockapp.exe",
         L"widgetservice.exe", L"widgets.exe",
         L"macoswint.exe", L"macoswin.exe",
@@ -82,9 +82,6 @@ BOOL CALLBACK ProcessMonitor::EnumWindowsPathProc(HWND hwnd, LPARAM lParam)
     if (!IsWindowVisible(hwnd) && !IsIconic(hwnd)) return TRUE;
     wchar_t title[256];
     if (GetWindowTextW(hwnd, title, 256) == 0) return TRUE;
-
-    // Skip owned windows (child dialogs, tooltips, etc.)
-    if (GetWindow(hwnd, GW_OWNER) != nullptr) return TRUE;
 
     DWORD pid = 0;
     GetWindowThreadProcessId(hwnd, &pid);

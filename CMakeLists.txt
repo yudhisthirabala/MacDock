@@ -37,6 +37,7 @@ set(SOURCES
     src/menubar/MenuBarWindow.cpp
     src/menubar/ActiveAppWatcher.cpp
     src/menubar/SystemInfoBar.cpp
+    src/menubar/WidgetPopup.cpp
 
     src/system/TaskbarManager.cpp
     src/system/TrayIcon.cpp

@@ -56,6 +56,32 @@ VolumeInfo SystemInfo::GetVolume()
     return result;
 }
 
+void SystemInfo::SetVolume(float scalar)
+{
+    if (scalar < 0.0f) scalar = 0.0f;
+    if (scalar > 1.0f) scalar = 1.0f;
+
+    IMMDeviceEnumerator* enumer = nullptr;
+    if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr,
+                                CLSCTX_INPROC_SERVER, __uuidof(IMMDeviceEnumerator),
+                                reinterpret_cast<void**>(&enumer))))
+        return;
+
+    IMMDevice* device = nullptr;
+    if (SUCCEEDED(enumer->GetDefaultAudioEndpoint(eRender, eConsole, &device)) && device)
+    {
+        IAudioEndpointVolume* vol = nullptr;
+        if (SUCCEEDED(device->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER,
+                                       nullptr, reinterpret_cast<void**>(&vol))) && vol)
+        {
+            vol->SetMasterVolumeLevelScalar(scalar, nullptr);
+            vol->Release();
+        }
+        device->Release();
+    }
+    enumer->Release();
+}
+
 WifiInfo SystemInfo::GetWifi()
 {
     WifiInfo result = { false, L"", 0 };

@@ -7,10 +7,12 @@
 #pragma once
 #include <windows.h>
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
 #include "SystemInfoBar.h"
+#include "WidgetPopup.h"
 #include "../system/CompositionHelper.h"
 
 class MenuBarWindow
@@ -37,6 +39,8 @@ private:
     void OnPaint();
     void RenderDComp();  // actual GDI+ rendering into the DComp surface
     void OnTimer();
+    void OnMouseMove(int x, int y);
+    void OnMouseLeave();
     void OnLButtonUp(int x, int y);
 
     HINSTANCE      m_hInstance;
@@ -63,6 +67,15 @@ private:
 
     // Widget hit rects (updated each paint, read in OnLButtonUp).
     WidgetHitRects m_widgetRects = {};
+
+    // Widget hover popup
+    std::unique_ptr<WidgetPopup> m_popup;
+    WidgetType m_hoveredWidget = WidgetType::None;
+    bool       m_mouseTracking = false;
+
+    // Timer for delayed popup hide (allows moving from widget to popup)
+    static constexpr UINT_PTR TIMER_POPUP_HIDE = 1002;
+    static constexpr UINT     POPUP_HIDE_DELAY = 150;
 
     // Now-Playing track text (DEC-024). Written by SMTC worker; read by OnPaint.
     std::mutex   m_nowPlayingMutex;

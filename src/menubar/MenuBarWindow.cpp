@@ -8,7 +8,6 @@
 #include "../system/CompositionHelper.h"
 
 #include <gdiplus.h>
-#include <shellapi.h>
 #include <chrono>
 
 #if __has_include(<winrt/Windows.Media.Control.h>)
@@ -109,6 +108,9 @@ bool MenuBarWindow::Create()
 
     m_sysInfo = SystemInfoBar::Fetch();
     SetTimer(m_hwnd, TIMER_TICK_ID, TIMER_TICK_MS, nullptr);
+
+    m_popup = std::make_unique<WidgetPopup>(m_hInstance);
+    if (!m_popup->Create()) m_popup.reset();
 
 #if HAS_SMTC
     m_smtcThread = std::thread([this]() {
@@ -211,11 +213,40 @@ LRESULT CALLBACK MenuBarWindow::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         return 1;
 
     case WM_TIMER:
+        if (wParam == TIMER_POPUP_HIDE)
+        {
+            KillTimer(hwnd, TIMER_POPUP_HIDE);
+            if (self->m_popup && self->m_popup->IsVisible())
+            {
+                POINT cur; GetCursorPos(&cur);
+                if (!self->m_popup->HitTest(cur))
+                {
+                    POINT client = cur;
+                    ScreenToClient(hwnd, &client);
+                    auto hitWidget = [&](const RECT& r) {
+                        return client.x >= r.left && client.x < r.right &&
+                               client.y >= r.top  && client.y < r.bottom;
+                    };
+                    bool overWidget = hitWidget(self->m_widgetRects.wifi) ||
+                                      hitWidget(self->m_widgetRects.volume) ||
+                                      hitWidget(self->m_widgetRects.battery) ||
+                                      hitWidget(self->m_widgetRects.clock);
+                    if (!overWidget)
+                        self->m_popup->Hide();
+                }
+            }
+            return 0;
+        }
         self->OnTimer();
         return 0;
 
     case WM_MOUSEMOVE:
+        self->OnMouseMove(LOWORD(lParam), HIWORD(lParam));
         InvalidateRect(hwnd, nullptr, FALSE);
+        return 0;
+
+    case WM_MOUSELEAVE:
+        self->OnMouseLeave();
         return 0;
 
     case WM_LBUTTONUP:
@@ -413,6 +444,62 @@ void MenuBarWindow::RenderDComp()
     m_dcomp.Commit();
 }
 
+// ─── Hover tracking ──────────────────────────────────────────────────────────
+
+void MenuBarWindow::OnMouseMove(int x, int y)
+{
+    if (!m_mouseTracking)
+    {
+        TRACKMOUSEEVENT tme = {};
+        tme.cbSize    = sizeof(tme);
+        tme.dwFlags   = TME_LEAVE;
+        tme.hwndTrack = m_hwnd;
+        TrackMouseEvent(&tme);
+        m_mouseTracking = true;
+    }
+
+    auto hitWidget = [x, y](const RECT& r) {
+        return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+    };
+
+    WidgetType hovered = WidgetType::None;
+    RECT anchorRect = {};
+    if      (hitWidget(m_widgetRects.wifi))    { hovered = WidgetType::Wifi;    anchorRect = m_widgetRects.wifi; }
+    else if (hitWidget(m_widgetRects.volume))  { hovered = WidgetType::Volume;  anchorRect = m_widgetRects.volume; }
+    else if (hitWidget(m_widgetRects.battery)) { hovered = WidgetType::Battery; anchorRect = m_widgetRects.battery; }
+    else if (hitWidget(m_widgetRects.clock))   { hovered = WidgetType::Clock;   anchorRect = m_widgetRects.clock; }
+
+    if (hovered != WidgetType::None && m_popup)
+    {
+        KillTimer(m_hwnd, TIMER_POPUP_HIDE);
+
+        if (hovered != m_hoveredWidget || !m_popup->IsVisible())
+        {
+            // Convert anchor rect to screen coords
+            RECT screenRect = anchorRect;
+            POINT tl = { screenRect.left, screenRect.top };
+            POINT br = { screenRect.right, screenRect.bottom };
+            ClientToScreen(m_hwnd, &tl);
+            ClientToScreen(m_hwnd, &br);
+            screenRect = { tl.x, tl.y, br.x, br.y };
+
+            m_popup->ShowFor(hovered, screenRect, m_sysInfo);
+            m_hoveredWidget = hovered;
+        }
+    }
+    else if (hovered == WidgetType::None && m_popup && m_popup->IsVisible())
+    {
+        SetTimer(m_hwnd, TIMER_POPUP_HIDE, POPUP_HIDE_DELAY, nullptr);
+    }
+}
+
+void MenuBarWindow::OnMouseLeave()
+{
+    m_mouseTracking = false;
+    if (m_popup && m_popup->IsVisible())
+        SetTimer(m_hwnd, TIMER_POPUP_HIDE, POPUP_HIDE_DELAY, nullptr);
+}
+
 // ─── Timer / click ────────────────────────────────────────────────────────────
 
 void MenuBarWindow::OnTimer()
@@ -426,12 +513,4 @@ void MenuBarWindow::OnLButtonUp(int x, int y)
     if      (PointInRect(x, y, m_prevRect)) SendMediaKey(VK_MEDIA_PREV_TRACK);
     else if (PointInRect(x, y, m_playRect)) SendMediaKey(VK_MEDIA_PLAY_PAUSE);
     else if (PointInRect(x, y, m_nextRect)) SendMediaKey(VK_MEDIA_NEXT_TRACK);
-    else if (PointInRect(x, y, m_widgetRects.wifi))
-        ShellExecuteW(nullptr, L"open", L"ms-settings:network-wifi", nullptr, nullptr, SW_SHOW);
-    else if (PointInRect(x, y, m_widgetRects.volume))
-        ShellExecuteW(nullptr, L"open", L"ms-settings:sound", nullptr, nullptr, SW_SHOW);
-    else if (PointInRect(x, y, m_widgetRects.battery))
-        ShellExecuteW(nullptr, L"open", L"ms-settings:batterysaver", nullptr, nullptr, SW_SHOW);
-    else if (PointInRect(x, y, m_widgetRects.clock))
-        ShellExecuteW(nullptr, L"open", L"ms-settings:dateandtime", nullptr, nullptr, SW_SHOW);
 }

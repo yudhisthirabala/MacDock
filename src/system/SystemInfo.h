@@ -31,6 +31,9 @@ public:
     // Returns current system volume (default audio endpoint)
     static VolumeInfo GetVolume();
 
+    // Sets system volume (0.0–1.0 scalar)
+    static void SetVolume(float scalar);
+
     // Returns current Wi-Fi connection status
     static WifiInfo GetWifi();
 };

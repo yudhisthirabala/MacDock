@@ -14,6 +14,7 @@
 #include <shlobj.h>
 #include <shobjidl.h>
 #include <commoncontrols.h>
+#include <commctrl.h>    // tooltip control
 #include <windowsx.h>   // GET_X_LPARAM / GET_Y_LPARAM
 #include <gdiplus.h>
 #include <algorithm>
@@ -39,6 +40,7 @@ DockWindow::DockWindow(HINSTANCE hInstance)
 DockWindow::~DockWindow()
 {
     m_dcomp.Release();
+    if (m_tooltip) DestroyWindow(m_tooltip);
     if (m_hwnd)
     {
         RevokeDragDrop(m_hwnd);
@@ -104,6 +106,19 @@ bool DockWindow::Create()
     Reposition();
 
     SetTimer(m_hwnd, TIMER_PROCESS_MONITOR, PROCESS_POLL_MS, nullptr);
+
+    // Tooltip for showing app names on hover (macOS-style label above icon)
+    m_tooltip = CreateWindowExW(
+        WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr,
+        WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP,
+        0, 0, 0, 0, m_hwnd, nullptr, m_hInstance, nullptr);
+    if (m_tooltip)
+    {
+        SendMessageW(m_tooltip, TTM_SETMAXTIPWIDTH, 0, 300);
+        SendMessageW(m_tooltip, TTM_SETDELAYTIME, TTDT_INITIAL, 200);
+        SendMessageW(m_tooltip, TTM_SETDELAYTIME, TTDT_RESHOW, 100);
+    }
+
     return true;
 }
 
@@ -522,6 +537,21 @@ void DockWindow::RenderDComp()
                 int drawLeft = slotCx - scaledSz / 2;
                 int drawTop  = S(ICON_BOTTOM_Y) - scaledSz;
 
+                // Bounce offset: two bounces using abs(sin) envelope
+                int bounceOff = 0;
+                if (idx == m_bounceIndex && m_bounceStartMs != 0)
+                {
+                    DWORD elapsed = GetTickCount() - m_bounceStartMs;
+                    if (elapsed < BOUNCE_DURATION_MS)
+                    {
+                        float t = static_cast<float>(elapsed) / static_cast<float>(BOUNCE_DURATION_MS);
+                        float decay = 1.0f - t;
+                        float bounce = fabsf(sinf(t * 3.14159265f * 2.0f)) * decay;
+                        bounceOff = static_cast<int>(S(BOUNCE_HEIGHT) * bounce);
+                    }
+                }
+                drawTop -= bounceOff;
+
                 Gdiplus::Bitmap* gbmp = nullptr;
                 if (icon->GetBitmap())
                     gbmp = Gdiplus::Bitmap::FromHBITMAP(icon->GetBitmap(), nullptr);
@@ -543,6 +573,24 @@ void DockWindow::RenderDComp()
                                   dotCx - dotR, dotCy - dotR,
                                   dotR * 2.0f, dotR * 2.0f);
                 }
+            }
+
+            // Separator line between pinned and running-only apps
+            // Find where pinned icons end (icons with IsRunning but not pinned would
+            // be appended after pinned ones — currently all icons are pinned, so the
+            // separator appears after the last icon as a visual anchor).
+            // For now draw a thin vertical separator after the last pinned icon,
+            // only if there are running-only icons that would follow.
+            // Since all current icons are pinned, draw the separator at the right
+            // edge of the last icon when there are multiple icons.
+            if (n >= 2)
+            {
+                RECT lastB = m_icons.back()->GetBounds();
+                float sepX = static_cast<float>(lastB.right + S(ICON_PADDING) / 2);
+                float sepT = static_cast<float>(S(ICON_BOTTOM_Y) - S(ICON_SIZE) + S(4));
+                float sepB = static_cast<float>(S(ICON_BOTTOM_Y) - S(4));
+                Gdiplus::Pen sepPen(Gdiplus::Color(60, 255, 255, 255), 1.0f);
+                g.DrawLine(&sepPen, sepX, sepT, sepX, sepB);
             }
         }
     }  // g destroyed here — required before EndDraw
@@ -568,6 +616,40 @@ void DockWindow::OnMouseMove(int x, int y)
     m_cursorPos = { x, y };
     InvalidateRect(m_hwnd, nullptr, FALSE);
 
+    // Tooltip: detect which icon is hovered
+    if (m_tooltip)
+    {
+        int newHover = -1;
+        POINT p { x, y };
+        for (int i = 0; i < static_cast<int>(m_icons.size()); ++i)
+        {
+            RECT b = m_icons[i]->GetBounds();
+            if (PtInRect(&b, p)) { newHover = i; break; }
+        }
+        if (newHover != m_hoveredIndex)
+        {
+            // Remove old tool
+            TOOLINFOW ti = {};
+            ti.cbSize = sizeof(ti);
+            ti.hwnd   = m_hwnd;
+            ti.uId    = 1;
+            SendMessageW(m_tooltip, TTM_DELTOOLW, 0, reinterpret_cast<LPARAM>(&ti));
+
+            m_hoveredIndex = newHover;
+            if (newHover >= 0)
+            {
+                RECT b = m_icons[newHover]->GetBounds();
+                ti.uFlags   = TTF_SUBCLASS;
+                ti.hwnd     = m_hwnd;
+                ti.uId      = 1;
+                ti.rect     = b;
+                ti.lpszText = const_cast<LPWSTR>(m_icons[newHover]->GetName().c_str());
+                SendMessageW(m_tooltip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&ti));
+                SendMessageW(m_tooltip, TTM_TRACKACTIVATE, TRUE, reinterpret_cast<LPARAM>(&ti));
+            }
+        }
+    }
+
     if (m_dragIndex >= 0 && !m_dragging)
     {
         int dx = x - m_dragStart.x;
@@ -583,6 +665,15 @@ void DockWindow::OnMouseMove(int x, int y)
 void DockWindow::OnMouseLeave()
 {
     m_mouseTracking = false;
+    if (m_tooltip && m_hoveredIndex >= 0)
+    {
+        TOOLINFOW ti = {};
+        ti.cbSize = sizeof(ti);
+        ti.hwnd   = m_hwnd;
+        ti.uId    = 1;
+        SendMessageW(m_tooltip, TTM_DELTOOLW, 0, reinterpret_cast<LPARAM>(&ti));
+        m_hoveredIndex = -1;
+    }
 }
 
 void DockWindow::OnLButtonDown(int x, int y)
@@ -632,7 +723,14 @@ void DockWindow::OnLButtonUp(int x, int y)
     if (dx * dx + dy * dy < DRAG_THRESHOLD * DRAG_THRESHOLD)
     {
         if (savedIndex >= 0 && savedIndex < static_cast<int>(m_icons.size()))
+        {
+            // Start bounce animation (macOS-style icon bounce on launch)
+            m_bounceIndex   = savedIndex;
+            m_bounceStartMs = GetTickCount();
+            SetTimer(m_hwnd, TIMER_BOUNCE, 16, nullptr);
+
             AppLauncher::LaunchOrFocus(m_icons[savedIndex]->GetPath());
+        }
     }
 }
 
@@ -761,6 +859,16 @@ void DockWindow::OnTimer(WPARAM timerId)
             m_cursorPos     = { -1, -1 };
             m_mouseTracking = false;
             KillTimer(m_hwnd, TIMER_ANIMATE);
+        }
+        InvalidateRect(m_hwnd, nullptr, FALSE);
+    }
+    else if (timerId == TIMER_BOUNCE)
+    {
+        DWORD elapsed = GetTickCount() - m_bounceStartMs;
+        if (elapsed >= BOUNCE_DURATION_MS)
+        {
+            m_bounceIndex = -1;
+            KillTimer(m_hwnd, TIMER_BOUNCE);
         }
         InvalidateRect(m_hwnd, nullptr, FALSE);
     }

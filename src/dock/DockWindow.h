@@ -106,8 +106,22 @@ private:
     static constexpr UINT_PTR TIMER_FLASH_REJECT    = 2;
     static constexpr UINT_PTR TIMER_ANIMATE         = 3;
     static constexpr UINT_PTR TIMER_ENTRANCE        = 4;
+    static constexpr UINT_PTR TIMER_BOUNCE          = 5;
 
     // Running indicator dot dimensions
     static constexpr int DOT_RADIUS = 2;
     static constexpr int DOT_OFFSET = 5;
+
+    // Tooltip state
+    HWND m_tooltip = nullptr;
+    int  m_hoveredIndex = -1;
+
+    // Bounce animation state (icon bounces on launch)
+    int   m_bounceIndex     = -1;
+    DWORD m_bounceStartMs   = 0;
+    static constexpr UINT BOUNCE_DURATION_MS = 500;
+    static constexpr int  BOUNCE_HEIGHT      = 18;
+
+    // Separator: index where pinned apps end and running-only apps begin
+    // (currently all icons are pinned, separator drawn after last pinned icon)
 };

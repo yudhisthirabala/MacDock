@@ -11,6 +11,7 @@
 #include <string>
 #include <thread>
 #include "SystemInfoBar.h"
+#include "FlyoutWindow.h"
 #include "../system/CompositionHelper.h"
 
 class MenuBarWindow
@@ -38,6 +39,8 @@ private:
     void RenderDComp();  // actual GDI+ rendering into the DComp surface
     void OnTimer();
     void OnLButtonUp(int x, int y);
+    void OnMouseMove(int x, int y);
+    void OnMouseLeave();
 
     HINSTANCE      m_hInstance;
     HWND           m_hwnd;
@@ -64,6 +67,14 @@ private:
     // Now-Playing track text (DEC-024). Written by SMTC worker; read by OnPaint.
     std::mutex   m_nowPlayingMutex;
     std::wstring m_nowPlayingText;
+
+    // Widget click targets (updated each paint)
+    WidgetHitRects m_widgetRects = {};
+
+    // Flyout popup (hover-triggered)
+    FlyoutWindow m_flyout;
+    FlyoutType   m_hoveredWidget = FlyoutType::None;
+    bool         m_trackingMouse = false;
 
     // Layout constants — logical pixels, multiplied by m_dpiScale at draw time.
     static constexpr int BAR_HEIGHT = 38;

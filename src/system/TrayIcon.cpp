@@ -16,7 +16,12 @@ constexpr UINT WM_TRAYICON = WM_APP + 1;
 constexpr UINT TRAY_ICON_UID = 1;
 
 // Context-menu command IDs.
-constexpr UINT IDM_QUIT = 1001;
+constexpr UINT IDM_QUIT    = 1001;
+constexpr UINT IDM_STARTUP = 1002;
+
+// Registry path for per-user auto-start (DEC-029)
+constexpr const wchar_t* STARTUP_REG_KEY   = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+constexpr const wchar_t* STARTUP_REG_VALUE = L"macOSWin";
 
 // Global hotkey ID (per-window; any unique int will do).
 // Ctrl+Alt+Q — primary quit path (DEC-009 revised), necessary because
@@ -126,6 +131,11 @@ LRESULT CALLBACK TrayIcon::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             PostQuitMessage(0);
             return 0;
         }
+        if (LOWORD(wParam) == IDM_STARTUP)
+        {
+            SetStartupEnabled(!IsStartupEnabled());
+            return 0;
+        }
         break;
 
     case WM_HOTKEY:
@@ -151,9 +161,11 @@ void TrayIcon::ShowContextMenu()
     HMENU menu = CreatePopupMenu();
     if (!menu) return;
 
+    UINT startupFlags = MF_STRING | (IsStartupEnabled() ? MF_CHECKED : MF_UNCHECKED);
+    AppendMenuW(menu, startupFlags, IDM_STARTUP, L"Run at startup");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, IDM_QUIT, L"Quit macOS Overlay");
 
-    // Required so the menu disappears when the user clicks outside it.
     SetForegroundWindow(m_hwnd);
 
     TrackPopupMenu(menu,
@@ -161,4 +173,39 @@ void TrayIcon::ShowContextMenu()
                    pt.x, pt.y, 0, m_hwnd, nullptr);
 
     DestroyMenu(menu);
+}
+
+bool TrayIcon::IsStartupEnabled()
+{
+    HKEY hKey = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, STARTUP_REG_KEY, 0, KEY_READ, &hKey) != ERROR_SUCCESS)
+        return false;
+
+    DWORD type = 0;
+    DWORD size = 0;
+    bool exists = (RegQueryValueExW(hKey, STARTUP_REG_VALUE, nullptr, &type, nullptr, &size) == ERROR_SUCCESS);
+    RegCloseKey(hKey);
+    return exists;
+}
+
+void TrayIcon::SetStartupEnabled(bool enable)
+{
+    HKEY hKey = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, STARTUP_REG_KEY, 0, KEY_WRITE, &hKey) != ERROR_SUCCESS)
+        return;
+
+    if (enable)
+    {
+        wchar_t exePath[MAX_PATH] = {};
+        GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+        DWORD len = static_cast<DWORD>((wcslen(exePath) + 1) * sizeof(wchar_t));
+        RegSetValueExW(hKey, STARTUP_REG_VALUE, 0, REG_SZ,
+                       reinterpret_cast<const BYTE*>(exePath), len);
+    }
+    else
+    {
+        RegDeleteValueW(hKey, STARTUP_REG_VALUE);
+    }
+
+    RegCloseKey(hKey);
 }

@@ -1,5 +1,5 @@
 // ConfigManager.h
-// Reads and writes the pinned apps configuration to pinned_apps.json.
+// Reads and writes the pinned apps configuration to %APPDATA%\macOSWin\pinned_apps.json.
 // Uses nlohmann/json (header-only).
 
 #pragma once
@@ -14,7 +14,7 @@ struct PinnedApp {
 class ConfigManager
 {
 public:
-    // Returns the path to pinned_apps.json (next to the running exe)
+    // Returns %APPDATA%\macOSWin\pinned_apps.json (DEC-028)
     static std::wstring GetConfigPath();
 
     // Load pinned apps from JSON. Creates empty file if missing.
@@ -22,4 +22,11 @@ public:
 
     // Save pinned apps to JSON. Uses write-then-rename for crash safety.
     static bool Save(const std::vector<PinnedApp>& apps);
+
+private:
+    // Returns the legacy next-to-exe config path for migration
+    static std::wstring GetLegacyConfigPath();
+
+    // Migrates legacy config to new location if needed (DEC-028)
+    static void MigrateLegacyConfig();
 };

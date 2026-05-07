@@ -196,11 +196,13 @@ SystemInfoData SystemInfoBar::Fetch()
     SystemInfoData d;
 
     BatteryInfo b = SystemInfo::GetBattery();
-    d.battery  = b.percent;
-    d.charging = b.charging;
+    d.battery         = b.percent;
+    d.charging        = b.charging;
+    d.batteryLifeTime = b.lifeTime;
 
     VolumeInfo v = SystemInfo::GetVolume();
     d.volume = v.muted ? 0 : v.percent;
+    d.muted  = v.muted;
 
     WifiInfo w = SystemInfo::GetWifi();
     d.wifiConnected = w.connected;
@@ -220,10 +222,9 @@ SystemInfoData SystemInfoBar::Fetch()
     return d;
 }
 
-int SystemInfoBar::Render(HDC hdc, RECT barRect, const SystemInfoData& data)
+int SystemInfoBar::Render(HDC hdc, RECT barRect, const SystemInfoData& data,
+                          WidgetHitRects* outRects)
 {
-    // Refresh DPI scale every frame so dragging between monitors at different
-    // scale factors keeps the widgets sized correctly.
     g_scale = GetDpiForSystem() / 96.0f;
 
     Graphics g(hdc);
@@ -233,14 +234,30 @@ int SystemInfoBar::Render(HDC hdc, RECT barRect, const SystemInfoData& data)
     int cy      = (barRect.top + barRect.bottom) / 2;
     int spacing = SI(WIDGET_SPACING);
     int right   = barRect.right - SI(RIGHT_PADDING);
+    int prevRight;
 
     // Right-to-left: clock, battery, volume, wifi
-    right = DrawClock(g,   right, cy, data.clock) - spacing;
+    prevRight = right;
+    right = DrawClock(g, right, cy, data.clock);
+    if (outRects) outRects->clock = { right, barRect.top, prevRight, barRect.bottom };
+    right -= spacing;
 
-    if (data.battery >= 0)
-        right = DrawBattery(g, right, cy, data.battery, data.charging) - spacing;
+    if (data.battery >= 0) {
+        prevRight = right;
+        right = DrawBattery(g, right, cy, data.battery, data.charging);
+        if (outRects) outRects->battery = { right, barRect.top, prevRight, barRect.bottom };
+        right -= spacing;
+    }
 
-    right = DrawVolume(g, right, cy, data.volume, data.volume == 0) - spacing;
-    right = DrawWifi(g,   right, cy, data.wifiConnected, data.wifiQuality) - spacing;
+    prevRight = right;
+    right = DrawVolume(g, right, cy, data.volume, data.volume == 0);
+    if (outRects) outRects->volume = { right, barRect.top, prevRight, barRect.bottom };
+    right -= spacing;
+
+    prevRight = right;
+    right = DrawWifi(g, right, cy, data.wifiConnected, data.wifiQuality);
+    if (outRects) outRects->wifi = { right, barRect.top, prevRight, barRect.bottom };
+    right -= spacing;
+
     return right;
 }

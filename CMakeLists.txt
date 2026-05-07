@@ -30,13 +30,13 @@ set(SOURCES
 
     src/dock/DockWindow.cpp
     src/dock/DockIcon.cpp
-    src/dock/DockDropHandler.cpp
     src/dock/DockDropTarget.cpp
     src/dock/DockDropValidator.cpp
 
     src/menubar/MenuBarWindow.cpp
     src/menubar/ActiveAppWatcher.cpp
     src/menubar/SystemInfoBar.cpp
+    src/menubar/FlyoutWindow.cpp
 
     src/system/TaskbarManager.cpp
     src/system/TrayIcon.cpp
@@ -44,6 +44,7 @@ set(SOURCES
     src/system/ProcessMonitor.cpp
     src/system/AppLauncher.cpp
     src/system/SystemInfo.cpp
+    src/system/CrashRecovery.cpp
 
     src/config/ConfigManager.cpp
 )
@@ -53,12 +54,9 @@ add_executable(macOSWin WIN32 ${SOURCES})
 
 # Link required Windows libraries
 target_link_libraries(macOSWin
-    d3d11           # Direct3D 11 — shared DComp device (DEC-027)
-    dxgi            # DXGI — IDXGIDevice + IDXGISurface1 GDI interop (DEC-027)
     d2d1            # Direct2D
     dwrite          # DirectWrite (text rendering)
-    dcomp           # DirectComposition surface rendering (DEC-027)
-    dwmapi          # Desktop Window Manager (DWMSBT_TRANSIENTWINDOW acrylic)
+    dwmapi          # Desktop Window Manager
     shell32         # ShellExecute, drag-drop, icon extraction
     ole32           # COM initialization
     oleaut32        # COM automation
@@ -70,6 +68,7 @@ target_link_libraries(macOSWin
     gdiplus         # High-quality bicubic icon scaling
     version         # Version info resource (ActiveAppWatcher FileDescription lookup)
     windowsapp      # C++/WinRT (SMTC playback state for MenuBarWindow)
+    advapi32        # Registry API (DEC-029 startup toggle)
 )
 
 # Compiler options

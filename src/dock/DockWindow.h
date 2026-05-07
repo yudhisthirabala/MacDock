@@ -1,7 +1,6 @@
 // DockWindow.h
 // Main Dock container window — borderless, always-on-top, centered at screen bottom.
-// Phase 6 (DEC-027): WS_EX_NOREDIRECTIONBITMAP + DWMSBT_TRANSIENTWINDOW (real acrylic)
-// + DirectComposition surface rendering (replaces WS_EX_LAYERED / UpdateLayeredWindow).
+// Renders via UpdateLayeredWindow (per-pixel alpha) with GDI+ bicubic scaling.
 
 #pragma once
 #include <windows.h>

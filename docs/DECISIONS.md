@@ -469,4 +469,36 @@
 
 ---
 
-*Last updated: 2026-04-18 | Session 013*
+### DEC-028 — Config Location
+- **Date:** 2026-05-07
+- **Session:** 015
+- **Raised by:** Claude Code
+- **Status:** APPROVED
+- **Context:** `pinned_apps.json` lives next to the exe, which breaks when the exe is in a write-protected directory and gets lost on rebuilds/moves.
+- **Options considered:**
+  - Option A: `%APPDATA%\macOSWin\pinned_apps.json` — standard per-user app data location, survives exe moves, auto-created on first run. Migrate old next-to-exe config automatically.
+  - Option B: Keep next-to-exe — no change, simple but fragile.
+  - Option C: `%LOCALAPPDATA%\macOSWin\` — like A but doesn't roam.
+- **Decision:** Option A — `%APPDATA%\macOSWin\pinned_apps.json` with auto-migration from old location.
+- **Approved by:** Bala (via chat on 2026-05-07)
+- **Notes:** On first run, if `%APPDATA%\macOSWin\pinned_apps.json` doesn't exist but the old next-to-exe config does, copy it over. All future reads/writes go to the new location.
+
+---
+
+### DEC-029 — Run at Windows Startup
+- **Date:** 2026-05-07
+- **Session:** 015
+- **Raised by:** Claude Code
+- **Status:** APPROVED
+- **Context:** The overlay must be launched manually after every reboot. Auto-start would complete the macOS illusion.
+- **Options considered:**
+  - Option A: Registry key `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` with opt-in toggle in tray menu. Default off.
+  - Option B: Startup folder shortcut (`.lnk` in `shell:startup`).
+  - Option C: No auto-start.
+- **Decision:** Option A — Registry `Run` key with a "Run at startup" toggle in the tray/quit menu. Default off.
+- **Approved by:** Bala (via chat on 2026-05-07)
+- **Notes:** Registry value name `macOSWin`, value = exe full path. Added/removed via `RegSetValueExW`/`RegDeleteValueW`. Toggle state read from registry on menu open. No admin rights required.
+
+---
+
+*Last updated: 2026-05-07 | Session 015*

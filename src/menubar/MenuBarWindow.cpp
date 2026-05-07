@@ -8,6 +8,8 @@
 #include "../system/CompositionHelper.h"
 
 #include <gdiplus.h>
+#include <shellapi.h>
+#include <windowsx.h>
 #include <chrono>
 
 #if __has_include(<winrt/Windows.Media.Control.h>)
@@ -49,7 +51,8 @@ static const Color kTrackFg(200, 180, 180, 185);
 // ─── Constructor / Destructor ─────────────────────────────────────────────────
 
 MenuBarWindow::MenuBarWindow(HINSTANCE hInstance)
-    : m_hInstance(hInstance), m_hwnd(nullptr), m_activeAppName(L"Dock")
+    : m_hInstance(hInstance), m_hwnd(nullptr), m_activeAppName(L"Dock"),
+      m_flyout(hInstance)
 {
     m_sysInfo.battery       = -1;
     m_sysInfo.charging      = false;
@@ -214,11 +217,27 @@ LRESULT CALLBACK MenuBarWindow::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         return 0;
 
     case WM_MOUSEMOVE:
+    {
+        if (!self->m_trackingMouse)
+        {
+            TRACKMOUSEEVENT tme = { sizeof(tme), TME_LEAVE, hwnd, 0 };
+            TrackMouseEvent(&tme);
+            self->m_trackingMouse = true;
+        }
+        int mx = GET_X_LPARAM(lParam);
+        int my = GET_Y_LPARAM(lParam);
+        self->OnMouseMove(mx, my);
         InvalidateRect(hwnd, nullptr, FALSE);
+        return 0;
+    }
+
+    case WM_MOUSELEAVE:
+        self->m_trackingMouse = false;
+        self->OnMouseLeave();
         return 0;
 
     case WM_LBUTTONUP:
-        self->OnLButtonUp(LOWORD(lParam), HIWORD(lParam));
+        self->OnLButtonUp(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         return 0;
 
     case WM_DISPLAYCHANGE:
@@ -405,7 +424,7 @@ void MenuBarWindow::RenderDComp()
 
         // Right-side widget cluster (clock, battery, volume, Wi-Fi).
         RECT rc = { 0, 0, w, h };
-        SystemInfoBar::Render(hdc, rc, m_sysInfo);
+        SystemInfoBar::Render(hdc, rc, m_sysInfo, &m_widgetRects);
     }  // g destroyed here — required before EndDraw
 
     m_dcomp.EndDraw();
@@ -425,4 +444,46 @@ void MenuBarWindow::OnLButtonUp(int x, int y)
     if      (PointInRect(x, y, m_prevRect)) SendMediaKey(VK_MEDIA_PREV_TRACK);
     else if (PointInRect(x, y, m_playRect)) SendMediaKey(VK_MEDIA_PLAY_PAUSE);
     else if (PointInRect(x, y, m_nextRect)) SendMediaKey(VK_MEDIA_NEXT_TRACK);
+}
+
+void MenuBarWindow::OnMouseMove(int x, int y)
+{
+    FlyoutType hit = FlyoutType::None;
+
+    if (PointInRect(x, y, m_widgetRects.clock))        hit = FlyoutType::Clock;
+    else if (PointInRect(x, y, m_widgetRects.battery))  hit = FlyoutType::Battery;
+    else if (PointInRect(x, y, m_widgetRects.volume))   hit = FlyoutType::Volume;
+    else if (PointInRect(x, y, m_widgetRects.wifi))     hit = FlyoutType::Wifi;
+
+    if (hit == m_hoveredWidget) return;
+    m_hoveredWidget = hit;
+
+    if (hit == FlyoutType::None)
+    {
+        m_flyout.Hide();
+        return;
+    }
+
+    auto toScreen = [this](const RECT& r) {
+        RECT s = r;
+        POINT tl = { s.left, s.top };
+        POINT br = { s.right, s.bottom };
+        ClientToScreen(m_hwnd, &tl);
+        ClientToScreen(m_hwnd, &br);
+        return RECT{ tl.x, tl.y, br.x, br.y };
+    };
+
+    RECT anchor = {};
+    if      (hit == FlyoutType::Clock)   anchor = toScreen(m_widgetRects.clock);
+    else if (hit == FlyoutType::Battery) anchor = toScreen(m_widgetRects.battery);
+    else if (hit == FlyoutType::Volume)  anchor = toScreen(m_widgetRects.volume);
+    else if (hit == FlyoutType::Wifi)    anchor = toScreen(m_widgetRects.wifi);
+
+    m_flyout.Show(hit, anchor, m_hwnd, m_sysInfo);
+}
+
+void MenuBarWindow::OnMouseLeave()
+{
+    m_hoveredWidget = FlyoutType::None;
+    m_flyout.Hide();
 }

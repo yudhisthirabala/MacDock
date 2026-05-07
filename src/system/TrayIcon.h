@@ -1,5 +1,5 @@
 // TrayIcon.h
-// System tray notification icon with a right-click "Quit" menu.
+// System tray notification icon with right-click menu (Quit + Run at startup).
 // Owns a hidden message-only window to receive Shell_NotifyIcon callbacks.
 // Provides the only user-facing path to exit the app cleanly (DEC-009).
 
@@ -25,6 +25,10 @@ private:
 
     // Displays the right-click context menu at the cursor position.
     void ShowContextMenu();
+
+    // DEC-029: startup registry helpers
+    static bool IsStartupEnabled();
+    static void SetStartupEnabled(bool enable);
 
     HINSTANCE        m_hInstance;
     HWND             m_hwnd;   // hidden message-only receiver window

@@ -13,13 +13,14 @@
 BatteryInfo SystemInfo::GetBattery()
 {
     SYSTEM_POWER_STATUS sps = {};
-    if (!GetSystemPowerStatus(&sps)) return { -1, false };
+    if (!GetSystemPowerStatus(&sps)) return { -1, false, -1 };
 
     BatteryInfo info;
     info.percent  = (sps.BatteryLifePercent == 255) ? -1 : static_cast<int>(sps.BatteryLifePercent);
     info.charging = (sps.ACLineStatus == 1);
-    // BatteryFlag bit 7 = "no system battery"
-    if (sps.BatteryFlag & 128) info.percent = -1;
+    info.lifeTime = (sps.BatteryLifeTime == static_cast<DWORD>(-1))
+                    ? -1 : static_cast<int>(sps.BatteryLifeTime);
+    if (sps.BatteryFlag & 128) { info.percent = -1; info.lifeTime = -1; }
     return info;
 }
 

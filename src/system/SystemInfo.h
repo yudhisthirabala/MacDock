@@ -9,6 +9,7 @@
 struct BatteryInfo {
     int  percent;   // 0–100, or -1 if no battery
     bool charging;  // true if AC power connected
+    int  lifeTime;  // seconds remaining on battery, -1 if unknown
 };
 
 struct VolumeInfo {

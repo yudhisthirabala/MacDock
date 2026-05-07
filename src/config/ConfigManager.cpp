@@ -4,6 +4,7 @@
 #include "ConfigManager.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <shlobj.h>
 #include <windows.h>
 
 using json = nlohmann::json;
@@ -27,7 +28,7 @@ static std::wstring U8toW(const std::string& s)
     return result;
 }
 
-std::wstring ConfigManager::GetConfigPath()
+std::wstring ConfigManager::GetLegacyConfigPath()
 {
     wchar_t exePath[MAX_PATH] = {};
     GetModuleFileNameW(nullptr, exePath, MAX_PATH);
@@ -38,8 +39,35 @@ std::wstring ConfigManager::GetConfigPath()
     return path + L"pinned_apps.json";
 }
 
+std::wstring ConfigManager::GetConfigPath()
+{
+    wchar_t appData[MAX_PATH] = {};
+    if (FAILED(SHGetFolderPathW(nullptr, CSIDL_APPDATA, nullptr, 0, appData)))
+    {
+        return GetLegacyConfigPath();
+    }
+    std::wstring dir = std::wstring(appData) + L"\\macOSWin";
+    CreateDirectoryW(dir.c_str(), nullptr);
+    return dir + L"\\pinned_apps.json";
+}
+
+void ConfigManager::MigrateLegacyConfig()
+{
+    std::wstring newPath = GetConfigPath();
+    if (GetFileAttributesW(newPath.c_str()) != INVALID_FILE_ATTRIBUTES)
+        return;
+
+    std::wstring legacyPath = GetLegacyConfigPath();
+    if (GetFileAttributesW(legacyPath.c_str()) == INVALID_FILE_ATTRIBUTES)
+        return;
+
+    CopyFileW(legacyPath.c_str(), newPath.c_str(), TRUE);
+}
+
 std::vector<PinnedApp> ConfigManager::Load()
 {
+    MigrateLegacyConfig();
+
     std::vector<PinnedApp> apps;
     std::wstring configPath = GetConfigPath();
 

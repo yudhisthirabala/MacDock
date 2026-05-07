@@ -13,6 +13,7 @@
 #include "system/TaskbarManager.h"
 #include "system/TrayIcon.h"
 #include "system/AppBarManager.h"
+#include "system/CrashRecovery.h"
 
 namespace {
 
@@ -68,11 +69,10 @@ private:
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 {
-    // Per-monitor DPI awareness — every child window (menu bar, dock) now
-    // scales its own internal coordinates via GetDpiForSystem, so text and
-    // glyphs render at native pixel density instead of being bitmap-stretched
-    // (which is what produced the "everything pixelated" look).
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
+    CrashRecovery::InstallExceptionHandler();
+    CrashRecovery::OnStartup();
 
     OleApartment     ole;           // must be first — sets up COM + OLE drag-drop
     GdiplusApartment gdip;          // GDI+ for bicubic-filtered icon rendering
@@ -117,5 +117,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
     }
 
     ActiveAppWatcher::Stop();
+    CrashRecovery::OnCleanExit();
     return static_cast<int>(msg.wParam);
 }

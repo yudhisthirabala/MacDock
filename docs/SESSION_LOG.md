@@ -765,6 +765,70 @@ Bala ran the build mid-session. Multiple Phase 6 features failed on their Win11 
 
 ---
 
+## Session 015 — 2026-05-07
+
+**Type:** Development
+**Participants:** Bala, Claude Code
+**Duration:** Single conversation
+**Phase at start:** Phase 6 In Progress
+**Phase at end:** Phase 6 In Progress
+
+### What Was Done
+- **DEC-028 (APPROVED):** Moved config from exe-relative path to `%APPDATA%\macOSWin\pinned_apps.json` with automatic migration of legacy config.
+- **DEC-029 (APPROVED):** Added "Run at startup" toggle to tray icon context menu via `HKCU\...\Run` registry key.
+- **Crash recovery:** Sentinel file (`%APPDATA%\macOSWin\.running`) + `SetUnhandledExceptionFilter` restores the Windows taskbar if the app crashes.
+- **Dead code cleanup:** Deleted `DockDropHandler.h/.cpp` (dead since Session 006), removed unused `d3d11`/`dxgi`/`dcomp` CMake link targets.
+- **Interactive menu bar widgets:** Added `WidgetHitRects` to `SystemInfoBar` so click/hover targets are tracked per-paint.
+- **macOS-style flyout popups:** Created `FlyoutWindow` class — dark rounded translucent panels that appear on hover over clock, battery, volume, and Wi-Fi widgets.
+- **Hover-triggered flyouts:** Changed from click-to-show to hover-to-show using `WM_MOUSEMOVE` + `WM_MOUSELEAVE` with `TrackMouseEvent`.
+- **Rich flyout details:**
+  - Clock: time, full date, timezone, week number, day of year
+  - Battery: level, status (Charging/Discharging/Fully Charged), power source, condition, time remaining
+  - Volume: real output device name (from COM `IMMDevice`), volume %, muted/active status
+  - Wi-Fi: SSID, signal strength with quality label, security type (WPA2-Personal etc.), IP address, connection status
+
+### Files Changed
+- `src/config/ConfigManager.h` — `%APPDATA%` path, migration methods
+- `src/config/ConfigManager.cpp` — `SHGetFolderPathW`, legacy migration logic
+- `src/system/TrayIcon.h` — startup toggle methods
+- `src/system/TrayIcon.cpp` — registry-based run-at-startup, context menu
+- `src/system/CrashRecovery.h` (new) — crash recovery header
+- `src/system/CrashRecovery.cpp` (new) — sentinel file + exception filter
+- `src/system/SystemInfo.h` — added `lifeTime` to `BatteryInfo`
+- `src/system/SystemInfo.cpp` — populate `BatteryLifeTime`
+- `src/main.cpp` — wired in crash recovery
+- `src/menubar/SystemInfoBar.h` — `WidgetHitRects`, `muted`/`batteryLifeTime` in `SystemInfoData`
+- `src/menubar/SystemInfoBar.cpp` — populate hit rects and new fields
+- `src/menubar/FlyoutWindow.h` (new) — flyout popup header
+- `src/menubar/FlyoutWindow.cpp` (new) — dark rounded flyout with rich system info
+- `src/menubar/MenuBarWindow.h` — flyout member, hover tracking
+- `src/menubar/MenuBarWindow.cpp` — hover-triggered flyouts, `OnMouseMove`/`OnMouseLeave`
+- `src/dock/DockDropHandler.h` (deleted)
+- `src/dock/DockDropHandler.cpp` (deleted)
+- `src/dock/DockWindow.h` — cleaned stale DComp comment
+- `CMakeLists.txt` — added FlyoutWindow.cpp, CrashRecovery.cpp, advapi32, removed dead libs
+- `CLAUDE.md` — updated file reference map and footer
+- `docs/DECISIONS.md` — DEC-028 and DEC-029 APPROVED
+- `docs/CHANGELOG.md` — v0.7.0 unreleased section
+- `docs/LOG.md` — Session 015 notes
+
+### Decisions Made
+- DEC-028 — APPROVED (config to `%APPDATA%\macOSWin\`)
+- DEC-029 — APPROVED (Option A: registry `HKCU\...\Run`)
+
+### Blockers / Notes
+- Tray icon right-click menu remains non-functional when `Shell_TrayWnd` is hidden (known since Session 003). Deferred.
+- DComp acrylic rewrite (DEC-027) deferred to a future session per user request.
+
+### Next Session Should
+1. Test all flyout panels thoroughly on Bala's machine.
+2. Consider DComp acrylic if user wants frosted glass effect.
+3. Dock entrance slide-up animation.
+4. Update `docs/TESTING.md` with Phase 6 test cases and results.
+5. Tag v0.7.0 once all Phase 6 polish items are verified.
+
+---
+
 *Template for future sessions:*
 ```
 ## Session XXX — YYYY-MM-DD

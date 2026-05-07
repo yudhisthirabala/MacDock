@@ -47,7 +47,7 @@
 │   ├── dock/
 │   │   ├── DockWindow.h / .cpp        ← Main dock container window
 │   │   ├── DockIcon.h / .cpp          ← Individual icon widget (paint, animate, click)
-│   │   ├── DockDropHandler.h / .cpp   ← Handles drag-drop of .exe/.lnk to pin apps
+│   │   ├── DockDropTarget.h / .cpp    ← OLE IDropTarget for drag-to-pin (DEC-011)
 │   │   └── DockDropValidator.h / .cpp ← Pure-logic file validation + name extraction (testable)
 │   ├── menubar/
 │   │   ├── MenuBarWindow.h / .cpp     ← Full-width top bar window
@@ -59,10 +59,10 @@
 │   │   ├── ProcessMonitor.h / .cpp    ← EnumWindows polling for running indicators
 │   │   ├── AppLauncher.h / .cpp       ← ShellExecute to open or focus apps
 │   │   ├── SystemInfo.h / .cpp        ← Battery, volume, Wi-Fi via Win32 APIs
-│   │   └── CompositionHelper.h        ← Header-only: blur-behind + primary-monitor size (DEC-022/025)
+│   │   ├── CrashRecovery.h / .cpp     ← Sentinel-file crash recovery for taskbar restore
+│   │   └── CompositionHelper.h        ← Header-only: layered-window rendering + primary-monitor size
 │   └── config/
-│       ├── ConfigManager.h / .cpp     ← Read/write pinned_apps.json
-│       └── pinned_apps.json           ← Persisted dock layout (user's pinned apps)
+│       └── ConfigManager.h / .cpp     ← Read/write %APPDATA%\macOSWin\pinned_apps.json (DEC-028)
 │
 ├── vendor/
 │   └── nlohmann/
@@ -194,4 +194,4 @@ Any time a decision is needed that affects architecture, file structure, behavio
 
 ---
 
-*Last updated: 2026-04-18 | Session 012 — v0.6.0 shipped: DEC-024 Now-Playing + DEC-025 primary-monitor only. DEC-022 blur, DEC-023 slide-up, DEC-026 window-animator all failed on Win11 and were deferred/dropped. Real acrylic requires DirectComposition rewrite — next session.*
+*Last updated: 2026-05-07 | Session 015 — Config moved to %APPDATA% (DEC-028), run-at-startup toggle (DEC-029), crash recovery sentinel, dead code cleanup. DComp acrylic deferred.*

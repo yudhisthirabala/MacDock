@@ -6,23 +6,22 @@
 ---
 
 ## [Unreleased] — v0.7.0
-> Phase 6 — DirectComposition rewrite (DEC-027)
+> Phase 6 — Polish
 
 ### Added
-- `src/system/CompositionHelper.h` — extended with DComp device infrastructure:
-  - `DCompWindow` struct (C++17 inline statics): shared D3D11 + DXGI + `IDCompositionDevice`, per-window `IDCompositionTarget` + `IDCompositionVisual` + `IDCompositionSurface` (GDI interop via `IDXGISurface1::GetDC`).
-  - `ApplySystemBackdrop(HWND)` — calls `DwmSetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE, DWMSBT_TRANSIENTWINDOW)` for real OS-level acrylic on Win11 22H2+; fails silently on older builds.
-  - `DWMWA_SYSTEMBACKDROP_TYPE` / `DWM_SYSTEMBACKDROP_TYPE` enum — guards for older SDK headers.
-- `CMakeLists.txt` — added `d3d11`, `dxgi` link targets.
+- **DEC-028: Config location** — `pinned_apps.json` moved from next-to-exe to `%APPDATA%\macOSWin\pinned_apps.json`. Auto-migrates legacy config on first run. Directory auto-created via `CreateDirectoryW`.
+- **DEC-029: Run at startup** — "Run at startup" toggle in the tray icon right-click menu. Writes/removes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\macOSWin`. Checkmark reflects current state on each menu open. Default: off.
 
 ### Changed
-- `DockWindow` (DEC-027): Removed `WS_EX_LAYERED` + `UpdateLayeredWindow` rendering path. Now uses `WS_EX_NOREDIRECTIONBITMAP` + `DWMSBT_TRANSIENTWINDOW` + `DCompWindow` (GDI+ → `IDCompositionSurface`). `WM_NCHITTEST` returns `HTTRANSPARENT` for the headroom zone above the pill. `DOCK_WINDOW_HEIGHT` reduced 72→60 to minimise the acrylic-backdrop zone above the pill.
-- `DockWindow::Show` (DEC-023): Entrance slide-up animation re-enabled. Uses `WM_TIMER` at 16ms with `SetWindowPos` only (no per-frame GDI re-render) — reliable because the DComp surface is rendered once and the compositor handles compositing each frame.
-- `MenuBarWindow` (DEC-027): Removed `WS_EX_LAYERED` + `SetLayeredWindowAttributes` + `BitBlt` rendering path. Now uses `WS_EX_NOREDIRECTIONBITMAP` + `DWMSBT_TRANSIENTWINDOW` + `DCompWindow`. Bar colours changed from alpha=255 (opaque) to 160–200 (semi-transparent) so the acrylic frosted-glass shows through.
+- `ConfigManager::GetConfigPath()` now returns `%APPDATA%\macOSWin\pinned_apps.json` via `SHGetFolderPathW(CSIDL_APPDATA)`.
+- `ConfigManager::Load()` calls `MigrateLegacyConfig()` on every load — copies old next-to-exe config to new location if the new file doesn't exist yet.
+- `TrayIcon::ShowContextMenu()` now shows "Run at startup" (checked/unchecked) above the quit item.
+- **Crash recovery** — `CrashRecovery` module writes a hidden sentinel file (`%APPDATA%\macOSWin\.running`) on startup and deletes it on clean exit. If the app crashes and the sentinel survives, the next launch auto-restores the Windows taskbar before proceeding. `SetUnhandledExceptionFilter` also restores the taskbar on unhandled exceptions.
 
-### Decisions
-- DEC-027: APPROVED + SHIPPED (Option A — full DComp rewrite, both bars).
-- DEC-022 / DEC-023: now addressed by DEC-027. Real acrylic via DWMSBT_TRANSIENTWINDOW; entrance animation via SetWindowPos + DComp (no per-frame re-render).
+### Removed
+- `DockDropHandler.h/.cpp` — dead code since Session 006 (replaced by OLE `DockDropTarget`).
+- `d3d11.lib`, `dxgi.lib`, `dcomp.lib` link dependencies — unused since DComp rewrite was reverted.
+- Stale DComp references in `DockWindow.h` header comment.
 
 ---
 

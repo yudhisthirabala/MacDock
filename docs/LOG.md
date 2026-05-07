@@ -5,6 +5,43 @@
 
 ---
 
+## 2026-05-07 | Session 015 — Config migration + startup toggle
+
+### DEC-028: Config location → %APPDATA%
+- `GetConfigPath()` now calls `SHGetFolderPathW(CSIDL_APPDATA)` → `%APPDATA%\macOSWin\pinned_apps.json`.
+- `CreateDirectoryW` called each time (idempotent) to ensure dir exists.
+- `MigrateLegacyConfig()` runs on every `Load()`: if new path doesn't exist but old next-to-exe path does, copies it over via `CopyFileW(src, dst, TRUE)` (bFailIfExists=TRUE prevents overwriting).
+- Falls back to legacy path if `SHGetFolderPathW` fails (unlikely but safe).
+- Existing gtest suite uses `GetConfigPath()` dynamically — tests automatically run against the new location.
+
+### DEC-029: Run at startup
+- Tray right-click menu now has "Run at startup" (checked/unchecked) above the separator and Quit.
+- `IsStartupEnabled()` checks `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` for value `macOSWin`.
+- `SetStartupEnabled(true)` writes the current exe path as `REG_SZ`.
+- `SetStartupEnabled(false)` deletes the value.
+- `advapi32.lib` added to CMake link targets for registry APIs.
+
+### Crash recovery
+- Sentinel file `%APPDATA%\macOSWin\.running` — created on startup, deleted on clean exit.
+- `OnStartup()` checks for stale sentinel → restores taskbar if previous instance crashed.
+- `SetUnhandledExceptionFilter` catches unhandled exceptions → restores taskbar + deletes sentinel.
+- Does NOT catch `taskkill /F` (SIGKILL equivalent) — in that case the sentinel persists and the next launch cleans up.
+
+### Dead code cleanup
+- Removed `DockDropHandler.h/.cpp` — dead since Session 006 (OLE `DockDropTarget` replaced it).
+- Removed `d3d11`, `dxgi`, `dcomp` from CMake link targets — unused since DComp rewrite was reverted.
+- Cleaned stale DComp comment in `DockWindow.h`.
+
+### Display-change robustness
+- Already handled: `DockWindow`, `MenuBarWindow`, and `AppBarManager` all respond to `WM_DISPLAYCHANGE`. No additional work needed.
+
+### Open items carried forward
+- [ ] Phase 6: DirectComposition acrylic/blur (deferred)
+- [ ] Phase 6: Dock entrance slide-up animation (deferred)
+- [ ] Phase 6: Tray icon asset (replace IDI_APPLICATION placeholder)
+
+---
+
 ## 2026-05-07 | Session 014 — Dock invisibility fix
 
 ### Root cause

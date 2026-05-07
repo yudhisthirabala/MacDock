@@ -947,6 +947,39 @@ void DockWindow::OnTimer(WPARAM timerId)
             }
         }
 
+        // Debug: dump running apps and pinned exe names to a log file
+        {
+            static DWORD s_lastDump = 0;
+            DWORD now = GetTickCount();
+            if (now - s_lastDump > 10000) // every 10 seconds
+            {
+                s_lastDump = now;
+                FILE* f = nullptr;
+                _wfopen_s(&f, L"dock_debug.log", L"w");
+                if (f)
+                {
+                    fwprintf(f, L"=== PINNED EXE NAMES ===\n");
+                    for (const auto& e : pinnedExeNames)
+                        fwprintf(f, L"  [%s]\n", e.c_str());
+                    fwprintf(f, L"\n=== RUNNING APPS (names) ===\n");
+                    for (const auto& e : running)
+                        fwprintf(f, L"  [%s]\n", e.c_str());
+                    fwprintf(f, L"\n=== RUNNING APPS (paths) ===\n");
+                    for (const auto& [k, v] : runningPaths)
+                        fwprintf(f, L"  [%s] -> [%s]\n", k.c_str(), v.c_str());
+                    fwprintf(f, L"\n=== SKIPPED (pinned match) ===\n");
+                    for (const auto& [k, v] : runningPaths)
+                        if (pinnedExeNames.count(k))
+                            fwprintf(f, L"  [%s]\n", k.c_str());
+                    fwprintf(f, L"\n=== WOULD ADD ===\n");
+                    for (const auto& [k, v] : runningPaths)
+                        if (!pinnedExeNames.count(k))
+                            fwprintf(f, L"  [%s] -> [%s]\n", k.c_str(), v.c_str());
+                    fclose(f);
+                }
+            }
+        }
+
         // Add temporary icons for running apps not already in dock
         for (const auto& [exeName, fullPath] : runningPaths)
         {

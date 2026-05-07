@@ -178,7 +178,7 @@ void DockWindow::Reposition()
     const int iconPad  = S(ICON_PADDING);
 
     // Extra width for the separator line at the end of the dock
-    int sepExtra = (count > 0) ? iconPad / 2 : 0;
+    int sepExtra = (count > 0) ? iconPad : 0;
     int dockW = (count == 0)
         ? S(DOCK_EMPTY_WIDTH)
         : (count + 1) * iconPad + count * iconSize + sepExtra;
@@ -565,7 +565,8 @@ void DockWindow::RenderDComp()
                 RECT first = m_icons.front()->GetBounds();
                 RECT last  = m_icons.back()->GetBounds();
                 pillL = first.left  - pillPadX;
-                pillR = last.right  + pillPadX;
+                // Extra room for the separator line at the right edge
+                pillR = last.right  + pillPadX + S(ICON_PADDING);
             }
             else
             {
@@ -672,15 +673,14 @@ void DockWindow::RenderDComp()
                 }
             }
 
-            // Separator: always draw a thin vertical line after the last
-            // pinned icon (macOS-style divider at end of dock).
+            // Separator: thin vertical line after the last pinned icon
             if (n >= 1)
             {
                 RECT lastB = m_icons.back()->GetBounds();
-                float sepX = static_cast<float>(lastB.right + S(ICON_PADDING) / 2);
-                float sepT = static_cast<float>(S(ICON_BOTTOM_Y) - S(ICON_SIZE) + S(6));
-                float sepB = static_cast<float>(S(ICON_BOTTOM_Y) - S(6));
-                Gdiplus::Pen sepPen(Gdiplus::Color(80, 255, 255, 255), 1.0f);
+                float sepX = static_cast<float>(lastB.right + S(ICON_PADDING));
+                float sepT = static_cast<float>(S(ICON_BOTTOM_Y) - S(ICON_SIZE) + S(8));
+                float sepB = static_cast<float>(S(ICON_BOTTOM_Y) - S(8));
+                Gdiplus::Pen sepPen(Gdiplus::Color(140, 255, 255, 255), 1.0f);
                 g.DrawLine(&sepPen, sepX, sepT, sepX, sepB);
             }
         }

@@ -134,12 +134,14 @@ void DockWindow::Show()
     int curX = wr.left;
     int curW = wr.right - wr.left;
 
-    // Entrance animation disabled — go straight to target position.
-    SetWindowPos(m_hwnd, HWND_TOPMOST, curX, m_targetY, curW, S(DOCK_WINDOW_HEIGHT),
+    SetWindowPos(m_hwnd, HWND_TOPMOST, curX, startY, curW, S(DOCK_WINDOW_HEIGHT),
                  SWP_NOACTIVATE | SWP_NOSIZE);
     ShowWindow(m_hwnd, SW_SHOWNOACTIVATE);
     RenderDComp();
-    (void)startY;
+
+    m_entranceActive  = true;
+    m_entranceStartMs = GetTickCount();
+    SetTimer(m_hwnd, TIMER_ENTRANCE, 16, nullptr);
 }
 
 // ─── Reposition ──────────────────────────────────────────────────────────────
@@ -780,12 +782,13 @@ void DockWindow::OnTimer(WPARAM timerId)
             SetWindowPos(m_hwnd, HWND_TOPMOST,
                          wr.left, m_targetY, 0, 0,
                          SWP_NOSIZE | SWP_NOACTIVATE);
+            m_dcomp.Recommit();
             return;
         }
 
         float T    = static_cast<float>(ENTRANCE_DURATION_MS);
         float t    = static_cast<float>(elapsed);
-        float ease = (2.0f * t / T) - (t * t) / (T * T); // ease-out quadratic [0..1]
+        float ease = (2.0f * t / T) - (t * t) / (T * T);
 
         int startY = m_targetY + S(DOCK_WINDOW_HEIGHT) + 20;
         int curY   = startY + static_cast<int>((m_targetY - startY) * ease);
@@ -795,5 +798,6 @@ void DockWindow::OnTimer(WPARAM timerId)
         SetWindowPos(m_hwnd, HWND_TOPMOST,
                      wr.left, curY, 0, 0,
                      SWP_NOSIZE | SWP_NOACTIVATE);
+        m_dcomp.Recommit();
     }
 }

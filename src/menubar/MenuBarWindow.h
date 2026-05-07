@@ -81,6 +81,12 @@ private:
     std::mutex   m_nowPlayingMutex;
     std::wstring m_nowPlayingText;
 
+    // Entrance animation state
+    bool  m_entranceActive  = false;
+    DWORD m_entranceStartMs = 0;
+    static constexpr UINT_PTR TIMER_ENTRANCE    = 1003;
+    static constexpr UINT     ENTRANCE_DURATION = 250;
+
     // Layout constants — logical pixels, multiplied by m_dpiScale at draw time.
     static constexpr int BAR_HEIGHT = 38;
 };

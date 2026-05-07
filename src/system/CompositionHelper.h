@@ -130,6 +130,21 @@ struct DCompWindow
 
     inline void Commit() { /* no-op — UpdateLayeredWindow already presents */ }
 
+    // Re-push the existing bitmap at the window's current position.
+    // Use after SetWindowPos to update the layered window without re-rendering.
+    inline void Recommit()
+    {
+        if (!m_hwnd || !m_dibBits) return;
+        RECT wr; GetWindowRect(m_hwnd, &wr);
+        POINT dst{ wr.left, wr.top };
+        SIZE  sz { w, h };
+        POINT src{ 0, 0 };
+        BLENDFUNCTION bf{ AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+        HDC screen = GetDC(nullptr);
+        UpdateLayeredWindow(m_hwnd, screen, &dst, &sz, m_memDC, &src, 0, &bf, ULW_ALPHA);
+        ReleaseDC(nullptr, screen);
+    }
+
     inline void Release()
     {
         ReleaseDib();

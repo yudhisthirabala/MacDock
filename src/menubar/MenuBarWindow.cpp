@@ -168,9 +168,17 @@ bool MenuBarWindow::Create()
 
 void MenuBarWindow::Show()
 {
+    int barH = static_cast<int>(BAR_HEIGHT * m_dpiScale + 0.5f);
+    SIZE mon = Composition::GetPrimaryMonitorSize();
+
+    // Start above the screen and slide down
+    SetWindowPos(m_hwnd, HWND_TOPMOST, 0, -barH, mon.cx, barH, SWP_NOACTIVATE);
     ShowWindow(m_hwnd, SW_SHOWNOACTIVATE);
-    // Render initial content immediately so the bar is visible on first frame.
     RenderDComp();
+
+    m_entranceActive  = true;
+    m_entranceStartMs = GetTickCount();
+    SetTimer(m_hwnd, TIMER_ENTRANCE, 16, nullptr);
 }
 
 // ─── SetActiveAppName ────────────────────────────────────────────────────────
@@ -213,6 +221,28 @@ LRESULT CALLBACK MenuBarWindow::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         return 1;
 
     case WM_TIMER:
+        if (wParam == TIMER_ENTRANCE)
+        {
+            int barH = static_cast<int>(BAR_HEIGHT * self->m_dpiScale + 0.5f);
+            DWORD elapsed = GetTickCount() - self->m_entranceStartMs;
+            if (elapsed >= self->ENTRANCE_DURATION)
+            {
+                self->m_entranceActive = false;
+                KillTimer(hwnd, TIMER_ENTRANCE);
+                SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                             SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER);
+                self->m_dcomp.Recommit();
+                return 0;
+            }
+            float T = static_cast<float>(self->ENTRANCE_DURATION);
+            float t = static_cast<float>(elapsed);
+            float ease = (2.0f * t / T) - (t * t) / (T * T);
+            int curY = -barH + static_cast<int>(barH * ease);
+            SetWindowPos(hwnd, HWND_TOPMOST, 0, curY, 0, 0,
+                         SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER);
+            self->m_dcomp.Recommit();
+            return 0;
+        }
         if (wParam == TIMER_POPUP_HIDE)
         {
             KillTimer(hwnd, TIMER_POPUP_HIDE);

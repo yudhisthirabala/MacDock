@@ -537,7 +537,7 @@ void DockWindow::RenderDComp()
                 int drawLeft = slotCx - scaledSz / 2;
                 int drawTop  = S(ICON_BOTTOM_Y) - scaledSz;
 
-                // Bounce offset: two bounces using abs(sin) envelope
+                // Bounce offset: 3 bounces with decay (macOS-style)
                 int bounceOff = 0;
                 if (idx == m_bounceIndex && m_bounceStartMs != 0)
                 {
@@ -545,8 +545,8 @@ void DockWindow::RenderDComp()
                     if (elapsed < BOUNCE_DURATION_MS)
                     {
                         float t = static_cast<float>(elapsed) / static_cast<float>(BOUNCE_DURATION_MS);
-                        float decay = 1.0f - t;
-                        float bounce = fabsf(sinf(t * 3.14159265f * 2.0f)) * decay;
+                        float decay = (1.0f - t) * (1.0f - t);
+                        float bounce = fabsf(sinf(t * 3.14159265f * 3.0f)) * decay;
                         bounceOff = static_cast<int>(S(BOUNCE_HEIGHT) * bounce);
                     }
                 }
@@ -575,22 +575,32 @@ void DockWindow::RenderDComp()
                 }
             }
 
-            // Separator line between pinned and running-only apps
-            // Find where pinned icons end (icons with IsRunning but not pinned would
-            // be appended after pinned ones — currently all icons are pinned, so the
-            // separator appears after the last icon as a visual anchor).
-            // For now draw a thin vertical separator after the last pinned icon,
-            // only if there are running-only icons that would follow.
-            // Since all current icons are pinned, draw the separator at the right
-            // edge of the last icon when there are multiple icons.
-            if (n >= 2)
+            // Separator: thin vertical line between the last non-running
+            // icon and the first running icon (macOS-style divider).
             {
-                RECT lastB = m_icons.back()->GetBounds();
-                float sepX = static_cast<float>(lastB.right + S(ICON_PADDING) / 2);
-                float sepT = static_cast<float>(S(ICON_BOTTOM_Y) - S(ICON_SIZE) + S(4));
-                float sepB = static_cast<float>(S(ICON_BOTTOM_Y) - S(4));
-                Gdiplus::Pen sepPen(Gdiplus::Color(60, 255, 255, 255), 1.0f);
-                g.DrawLine(&sepPen, sepX, sepT, sepX, sepB);
+                int lastNonRunning = -1;
+                int firstRunning   = -1;
+                for (int i = 0; i < n; ++i)
+                {
+                    if (m_icons[i]->IsRunning())
+                    {
+                        if (firstRunning < 0) firstRunning = i;
+                    }
+                    else
+                    {
+                        lastNonRunning = i;
+                    }
+                }
+                if (lastNonRunning >= 0 && firstRunning >= 0 && firstRunning > lastNonRunning)
+                {
+                    RECT bL = m_icons[lastNonRunning]->GetBounds();
+                    RECT bR = m_icons[firstRunning]->GetBounds();
+                    float sepX = static_cast<float>(bL.right + bR.left) / 2.0f;
+                    float sepT = static_cast<float>(S(ICON_BOTTOM_Y) - S(ICON_SIZE) + S(4));
+                    float sepB = static_cast<float>(S(ICON_BOTTOM_Y) - S(4));
+                    Gdiplus::Pen sepPen(Gdiplus::Color(80, 255, 255, 255), 1.0f);
+                    g.DrawLine(&sepPen, sepX, sepT, sepX, sepB);
+                }
             }
         }
     }  // g destroyed here — required before EndDraw
@@ -750,6 +760,8 @@ void DockWindow::OnTimer(WPARAM timerId)
         bool changed = false;
 
         static std::unordered_map<std::wstring, std::wstring> s_exeCache;
+        static bool s_cacheBuilt = false;
+        if (!s_cacheBuilt) { s_exeCache.clear(); s_cacheBuilt = true; }
 
         auto resolveExeName = [](const std::wstring& path) -> std::wstring {
             auto lower = [](std::wstring s) {
@@ -761,53 +773,63 @@ void DockWindow::OnTimer(WPARAM timerId)
                 return (slash != std::wstring::npos) ? p.substr(slash + 1) : p;
             };
 
-            // UWP shell:AppsFolder paths — extract the package family name
-            // and match against running process exe names by querying the
-            // package's executable from the shell.
             const std::wstring shellPrefix = L"shell:AppsFolder\\";
             if (path.size() > shellPrefix.size() &&
                 lower(path.substr(0, shellPrefix.size())) == lower(shellPrefix))
             {
-                // Extract the package family name (before the '!' in the AUMID)
-                std::wstring aumid = path.substr(shellPrefix.size());
-                std::wstring familyName = aumid;
+                std::wstring aumid = lower(path.substr(shellPrefix.size()));
+
+                // If the AUMID contains .EXE, extract it directly (e.g. Microsoft.Office.WINWORD.EXE.15)
+                size_t exePos = aumid.find(L".exe");
+                if (exePos != std::wstring::npos)
+                {
+                    // Walk backwards to find the start of the exe name
+                    size_t start = aumid.rfind(L'.', exePos - 1);
+                    if (start == std::wstring::npos) start = 0; else ++start;
+                    std::wstring exe = aumid.substr(start, exePos - start + 4);
+                    return exe;
+                }
+
+                // Known UWP app-to-exe mappings (match against full lowered AUMID)
+                struct Mapping { const wchar_t* pattern; const wchar_t* exe; };
+                static const Mapping mappings[] = {
+                    { L"immersivecontrolpanel",  L"systemsettings.exe" },
+                    { L"msedge",                 L"msedge.exe" },
+                    { L"microsoftedge",          L"msedge.exe" },
+                    { L"windowsterminal",        L"windowsterminal.exe" },
+                    { L"windows.photos",         L"microsoft.photos.exe" },
+                    { L"photos",                 L"microsoft.photos.exe" },
+                    { L"zunemusic",              L"music.ui.exe" },
+                    { L"zunevideo",              L"video.ui.exe" },
+                    { L"windowscalculator",      L"calculatorapp.exe" },
+                    { L"windowsstore",           L"winstore.app.exe" },
+                    { L"windowscamera",          L"windowscamera.exe" },
+                    { L"windowsalarms",          L"time.exe" },
+                    { L"outlook",                L"olk.exe" },
+                    { L"windowsnotepad",         L"notepad.exe" },
+                    { L"paint",                  L"mspaint.exe" },
+                    { L"whatsapp",               L"whatsapp.exe" },
+                    { L"gamingapp",              L"gamingservicesui.exe" },
+                    { L"xbox",                   L"gamebar.exe" },
+                    { L"chrome",                 L"chrome.exe" },
+                    { L"spotify",                L"spotify.exe" },
+                    { L"discord",                L"discord.exe" },
+                    { L"teams",                  L"ms-teams.exe" },
+                    { L"onenote",                L"onenote.exe" },
+                    { L"clipchamp",              L"clipchamp.exe" },
+                    { L"screenclipping",         L"snippingtool.exe" },
+                    { L"snippingtool",           L"snippingtool.exe" },
+                };
+                for (const auto& m : mappings)
+                {
+                    if (aumid.find(m.pattern) != std::wstring::npos)
+                        return m.exe;
+                }
+
+                // Fallback: extract the part after the last backslash or dot
+                // as a guess (won't match most cases but better than nothing)
                 size_t bang = aumid.find(L'!');
-                if (bang != std::wstring::npos)
-                    familyName = aumid.substr(0, bang);
-
-                // Try to find the running process by enumerating windows and
-                // checking if their process package family matches.
-                // Simpler approach: use known UWP-to-exe mappings for common apps.
-                std::wstring lowerFamily = lower(familyName);
-                if (lowerFamily.find(L"immersivecontrolpanel") != std::wstring::npos)
-                    return L"systemsettings.exe";
-                if (lowerFamily.find(L"microsoftedge") != std::wstring::npos)
-                    return L"msedge.exe";
-                if (lowerFamily.find(L"windowsterminal") != std::wstring::npos)
-                    return L"windowsterminal.exe";
-                if (lowerFamily.find(L"windows.photos") != std::wstring::npos)
-                    return L"microsoft.photos.exe";
-                if (lowerFamily.find(L"zunemusic") != std::wstring::npos)
-                    return L"music.ui.exe";
-                if (lowerFamily.find(L"zunevideo") != std::wstring::npos)
-                    return L"video.ui.exe";
-                if (lowerFamily.find(L"windowscalculator") != std::wstring::npos)
-                    return L"calculatorapp.exe";
-                if (lowerFamily.find(L"windowsstore") != std::wstring::npos)
-                    return L"winstore.app.exe";
-                if (lowerFamily.find(L"windowscamera") != std::wstring::npos)
-                    return L"windowscamera.exe";
-                if (lowerFamily.find(L"windowsalarms") != std::wstring::npos)
-                    return L"time.exe";
-                if (lowerFamily.find(L"outlook") != std::wstring::npos)
-                    return L"olk.exe";
-                if (lowerFamily.find(L"windowsnotepad") != std::wstring::npos)
-                    return L"notepad.exe";
-                if (lowerFamily.find(L"paint") != std::wstring::npos)
-                    return L"mspaint.exe";
-
-                // Fallback: use the family name itself (unlikely to match, but
-                // better than an empty string)
+                std::wstring familyName = (bang != std::wstring::npos) ? aumid.substr(0, bang) : aumid;
                 return lower(familyName);
             }
 

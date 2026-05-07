@@ -119,7 +119,7 @@ private:
     // Bounce animation state (icon bounces on launch)
     int   m_bounceIndex     = -1;
     DWORD m_bounceStartMs   = 0;
-    static constexpr UINT BOUNCE_DURATION_MS = 500;
+    static constexpr UINT BOUNCE_DURATION_MS = 700;
     static constexpr int  BOUNCE_HEIGHT      = 18;
 
     // Separator: index where pinned apps end and running-only apps begin

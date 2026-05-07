@@ -660,6 +660,57 @@ void DockWindow::OnTimer(WPARAM timerId)
                 size_t slash = p.find_last_of(L"\\/");
                 return (slash != std::wstring::npos) ? p.substr(slash + 1) : p;
             };
+
+            // UWP shell:AppsFolder paths — extract the package family name
+            // and match against running process exe names by querying the
+            // package's executable from the shell.
+            const std::wstring shellPrefix = L"shell:AppsFolder\\";
+            if (path.size() > shellPrefix.size() &&
+                lower(path.substr(0, shellPrefix.size())) == lower(shellPrefix))
+            {
+                // Extract the package family name (before the '!' in the AUMID)
+                std::wstring aumid = path.substr(shellPrefix.size());
+                std::wstring familyName = aumid;
+                size_t bang = aumid.find(L'!');
+                if (bang != std::wstring::npos)
+                    familyName = aumid.substr(0, bang);
+
+                // Try to find the running process by enumerating windows and
+                // checking if their process package family matches.
+                // Simpler approach: use known UWP-to-exe mappings for common apps.
+                std::wstring lowerFamily = lower(familyName);
+                if (lowerFamily.find(L"immersivecontrolpanel") != std::wstring::npos)
+                    return L"systemsettings.exe";
+                if (lowerFamily.find(L"microsoftedge") != std::wstring::npos)
+                    return L"msedge.exe";
+                if (lowerFamily.find(L"windowsterminal") != std::wstring::npos)
+                    return L"windowsterminal.exe";
+                if (lowerFamily.find(L"windows.photos") != std::wstring::npos)
+                    return L"microsoft.photos.exe";
+                if (lowerFamily.find(L"zunemusic") != std::wstring::npos)
+                    return L"music.ui.exe";
+                if (lowerFamily.find(L"zunevideo") != std::wstring::npos)
+                    return L"video.ui.exe";
+                if (lowerFamily.find(L"windowscalculator") != std::wstring::npos)
+                    return L"calculatorapp.exe";
+                if (lowerFamily.find(L"windowsstore") != std::wstring::npos)
+                    return L"winstore.app.exe";
+                if (lowerFamily.find(L"windowscamera") != std::wstring::npos)
+                    return L"windowscamera.exe";
+                if (lowerFamily.find(L"windowsalarms") != std::wstring::npos)
+                    return L"time.exe";
+                if (lowerFamily.find(L"outlook") != std::wstring::npos)
+                    return L"olk.exe";
+                if (lowerFamily.find(L"windowsnotepad") != std::wstring::npos)
+                    return L"notepad.exe";
+                if (lowerFamily.find(L"paint") != std::wstring::npos)
+                    return L"mspaint.exe";
+
+                // Fallback: use the family name itself (unlikely to match, but
+                // better than an empty string)
+                return lower(familyName);
+            }
+
             std::wstring lowerPath = lower(path);
             if (lowerPath.size() >= 4 &&
                 lowerPath.substr(lowerPath.size() - 4) == L".lnk")

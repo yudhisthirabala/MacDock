@@ -137,10 +137,10 @@ void DockWindow::Show()
     SetWindowPos(m_hwnd, HWND_TOPMOST, curX, startY, curW, S(DOCK_WINDOW_HEIGHT),
                  SWP_NOACTIVATE | SWP_NOSIZE);
     ShowWindow(m_hwnd, SW_SHOWNOACTIVATE);
-    RenderDComp();
 
     m_entranceActive  = true;
     m_entranceStartMs = GetTickCount();
+    RenderDComp();
     SetTimer(m_hwnd, TIMER_ENTRANCE, 16, nullptr);
 }
 
@@ -782,7 +782,7 @@ void DockWindow::OnTimer(WPARAM timerId)
             SetWindowPos(m_hwnd, HWND_TOPMOST,
                          wr.left, m_targetY, 0, 0,
                          SWP_NOSIZE | SWP_NOACTIVATE);
-            m_dcomp.Recommit();
+            RenderDComp();
             return;
         }
 
@@ -798,6 +798,6 @@ void DockWindow::OnTimer(WPARAM timerId)
         SetWindowPos(m_hwnd, HWND_TOPMOST,
                      wr.left, curY, 0, 0,
                      SWP_NOSIZE | SWP_NOACTIVATE);
-        m_dcomp.Recommit();
+        RenderDComp();
     }
 }

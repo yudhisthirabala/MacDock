@@ -174,10 +174,10 @@ void MenuBarWindow::Show()
     // Start above the screen and slide down
     SetWindowPos(m_hwnd, HWND_TOPMOST, 0, -barH, mon.cx, barH, SWP_NOACTIVATE);
     ShowWindow(m_hwnd, SW_SHOWNOACTIVATE);
-    RenderDComp();
 
     m_entranceActive  = true;
     m_entranceStartMs = GetTickCount();
+    RenderDComp();
     SetTimer(m_hwnd, TIMER_ENTRANCE, 16, nullptr);
 }
 
@@ -231,7 +231,7 @@ LRESULT CALLBACK MenuBarWindow::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                 KillTimer(hwnd, TIMER_ENTRANCE);
                 SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                              SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER);
-                self->m_dcomp.Recommit();
+                self->RenderDComp();
                 return 0;
             }
             float T = static_cast<float>(self->ENTRANCE_DURATION);
@@ -240,7 +240,7 @@ LRESULT CALLBACK MenuBarWindow::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             int curY = -barH + static_cast<int>(barH * ease);
             SetWindowPos(hwnd, HWND_TOPMOST, 0, curY, 0, 0,
                          SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER);
-            self->m_dcomp.Recommit();
+            self->RenderDComp();
             return 0;
         }
         if (wParam == TIMER_POPUP_HIDE)

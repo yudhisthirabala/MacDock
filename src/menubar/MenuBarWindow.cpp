@@ -176,7 +176,7 @@ void MenuBarWindow::Show()
     ShowWindow(m_hwnd, SW_SHOWNOACTIVATE);
 
     m_entranceActive  = true;
-    m_entranceStartMs = GetTickCount();
+    m_entranceStartMs = 0;  // set on first timer tick
     RenderDComp();
     SetTimer(m_hwnd, TIMER_ENTRANCE, 16, nullptr);
 }
@@ -223,6 +223,8 @@ LRESULT CALLBACK MenuBarWindow::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
     case WM_TIMER:
         if (wParam == TIMER_ENTRANCE)
         {
+            if (self->m_entranceStartMs == 0)
+                self->m_entranceStartMs = GetTickCount();
             int barH = static_cast<int>(BAR_HEIGHT * self->m_dpiScale + 0.5f);
             DWORD elapsed = GetTickCount() - self->m_entranceStartMs;
             if (elapsed >= self->ENTRANCE_DURATION)

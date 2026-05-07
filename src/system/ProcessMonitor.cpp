@@ -24,8 +24,8 @@ BOOL CALLBACK ProcessMonitor::EnumWindowsProc(HWND hwnd, LPARAM lParam)
 {
     auto* result = reinterpret_cast<std::unordered_set<std::wstring>*>(lParam);
 
-    // Only consider visible top-level windows with a title
-    if (!IsWindowVisible(hwnd)) return TRUE;
+    // Consider visible OR minimized top-level windows with a title
+    if (!IsWindowVisible(hwnd) && !IsIconic(hwnd)) return TRUE;
     wchar_t title[256];
     if (GetWindowTextW(hwnd, title, 256) == 0) return TRUE;
 

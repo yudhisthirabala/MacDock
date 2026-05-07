@@ -2,6 +2,7 @@
 // JSON config read/write using nlohmann/json.
 
 #include "ConfigManager.h"
+#include "../dock/DockDropValidator.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <windows.h>
@@ -61,7 +62,19 @@ std::vector<PinnedApp> ConfigManager::Load()
             app.name = U8toW(item.value("name", ""));
             app.path = U8toW(item.value("path", ""));
             if (!app.path.empty())
+            {
+                // Re-derive name if it's empty or purely numeric (e.g. "15")
+                bool needsRename = app.name.empty();
+                if (!needsRename)
+                {
+                    needsRename = true;
+                    for (wchar_t c : app.name)
+                        if (!iswdigit(c)) { needsRename = false; break; }
+                }
+                if (needsRename)
+                    app.name = DockDropValidator::ExtractAppName(app.path);
                 apps.push_back(app);
+            }
         }
     }
     catch (...) { /* malformed JSON — return empty */ }

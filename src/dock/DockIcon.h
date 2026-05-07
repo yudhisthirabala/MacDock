@@ -34,6 +34,10 @@ public:
     bool IsRunning() const { return m_isRunning; }
     void SetRunning(bool running) { m_isRunning = running; }
 
+    // Whether this icon is pinned (saved to config) or temporary (running-only)
+    bool IsPinned() const { return m_isPinned; }
+    void SetPinned(bool pinned) { m_isPinned = pinned; }
+
     // Bounding rect in Dock coordinates (set by DockWindow during layout)
     RECT GetBounds() const { return m_bounds; }
     void SetBounds(RECT bounds) { m_bounds = bounds; }
@@ -45,5 +49,6 @@ private:
     HBITMAP      m_bitmap;
     float        m_scale     = 1.0f;
     bool         m_isRunning = false;
+    bool         m_isPinned  = true;
     RECT         m_bounds    = {};
 };

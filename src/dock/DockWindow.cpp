@@ -177,8 +177,13 @@ void DockWindow::Reposition()
     const int iconSize = S(ICON_SIZE);
     const int iconPad  = S(ICON_PADDING);
 
-    // Extra width for the separator line at the end of the dock
-    int sepExtra = (count > 0) ? iconPad : 0;
+    // Count pinned icons to position the separator
+    int pinnedCount = 0;
+    for (const auto& icon : m_icons)
+        if (icon->IsPinned()) ++pinnedCount;
+
+    // Extra width for the separator between pinned and temp icons
+    int sepExtra = (pinnedCount > 0) ? iconPad : 0;
     int dockW = (count == 0)
         ? S(DOCK_EMPTY_WIDTH)
         : (count + 1) * iconPad + count * iconSize + sepExtra;
@@ -362,9 +367,9 @@ bool DockWindow::HasIcon(const std::wstring& appPath) const
 void DockWindow::SaveConfig()
 {
     std::vector<PinnedApp> apps;
-    apps.reserve(m_icons.size());
     for (const auto& icon : m_icons)
-        apps.push_back({ icon->GetName(), icon->GetPath() });
+        if (icon->IsPinned())
+            apps.push_back({ icon->GetName(), icon->GetPath() });
     ConfigManager::Save(apps);
 }
 
@@ -673,15 +678,29 @@ void DockWindow::RenderDComp()
                 }
             }
 
-            // Separator: thin vertical line after the last pinned icon
-            if (n >= 1)
+            // Separator: thin vertical line between pinned and temporary icons
             {
-                RECT lastB = m_icons.back()->GetBounds();
-                float sepX = static_cast<float>(lastB.right + S(ICON_PADDING));
-                float sepT = static_cast<float>(S(ICON_BOTTOM_Y) - S(ICON_SIZE) + S(8));
-                float sepB = static_cast<float>(S(ICON_BOTTOM_Y) - S(8));
-                Gdiplus::Pen sepPen(Gdiplus::Color(140, 255, 255, 255), 1.0f);
-                g.DrawLine(&sepPen, sepX, sepT, sepX, sepB);
+                int lastPinned = -1;
+                for (int i = 0; i < n; ++i)
+                    if (m_icons[i]->IsPinned()) lastPinned = i;
+
+                if (lastPinned >= 0)
+                {
+                    RECT bL = m_icons[lastPinned]->GetBounds();
+                    float sepX;
+                    if (lastPinned + 1 < n)
+                    {
+                        RECT bR = m_icons[lastPinned + 1]->GetBounds();
+                        sepX = static_cast<float>(bL.right + bR.left) / 2.0f;
+                    }
+                    else
+                        sepX = static_cast<float>(bL.right + S(ICON_PADDING));
+
+                    float sepT = static_cast<float>(S(ICON_BOTTOM_Y) - S(ICON_SIZE) + S(8));
+                    float sepB = static_cast<float>(S(ICON_BOTTOM_Y) - S(8));
+                    Gdiplus::Pen sepPen(Gdiplus::Color(180, 255, 255, 255), 1.0f);
+                    g.DrawLine(&sepPen, sepX, sepT, sepX, sepB);
+                }
             }
         }
     }  // g destroyed here — required before EndDraw
@@ -819,11 +838,10 @@ void DockWindow::OnTimer(WPARAM timerId)
     if (timerId == TIMER_PROCESS_MONITOR)
     {
         auto running = ProcessMonitor::GetRunningAppNames();
+        auto runningPaths = ProcessMonitor::GetRunningAppPaths();
         bool changed = false;
 
         static std::unordered_map<std::wstring, std::wstring> s_exeCache;
-        static bool s_cacheBuilt = false;
-        if (!s_cacheBuilt) { s_exeCache.clear(); s_cacheBuilt = true; }
 
         auto resolveExeName = [](const std::wstring& path) -> std::wstring {
             auto lower = [](std::wstring s) {
@@ -841,18 +859,14 @@ void DockWindow::OnTimer(WPARAM timerId)
             {
                 std::wstring aumid = lower(path.substr(shellPrefix.size()));
 
-                // If the AUMID contains .EXE, extract it directly (e.g. Microsoft.Office.WINWORD.EXE.15)
                 size_t exePos = aumid.find(L".exe");
                 if (exePos != std::wstring::npos)
                 {
-                    // Walk backwards to find the start of the exe name
                     size_t start = aumid.rfind(L'.', exePos - 1);
                     if (start == std::wstring::npos) start = 0; else ++start;
-                    std::wstring exe = aumid.substr(start, exePos - start + 4);
-                    return exe;
+                    return aumid.substr(start, exePos - start + 4);
                 }
 
-                // Known UWP app-to-exe mappings (match against full lowered AUMID)
                 struct Mapping { const wchar_t* pattern; const wchar_t* exe; };
                 static const Mapping mappings[] = {
                     { L"immersivecontrolpanel",  L"systemsettings.exe" },
@@ -883,13 +897,9 @@ void DockWindow::OnTimer(WPARAM timerId)
                     { L"snippingtool",           L"snippingtool.exe" },
                 };
                 for (const auto& m : mappings)
-                {
                     if (aumid.find(m.pattern) != std::wstring::npos)
                         return m.exe;
-                }
 
-                // Fallback: extract the part after the last backslash or dot
-                // as a guess (won't match most cases but better than nothing)
                 size_t bang = aumid.find(L'!');
                 std::wstring familyName = (bang != std::wstring::npos) ? aumid.substr(0, bang) : aumid;
                 return lower(familyName);
@@ -905,8 +915,11 @@ void DockWindow::OnTimer(WPARAM timerId)
             return lower(basename(path));
         };
 
+        // Build set of exe names that pinned icons resolve to
+        std::unordered_set<std::wstring> pinnedExeNames;
         for (const auto& icon : m_icons)
         {
+            if (!icon->IsPinned()) continue;
             const std::wstring& path = icon->GetPath();
             auto it = s_exeCache.find(path);
             if (it == s_exeCache.end())
@@ -918,8 +931,64 @@ void DockWindow::OnTimer(WPARAM timerId)
                 icon->SetRunning(isRunning);
                 changed = true;
             }
+            pinnedExeNames.insert(it->second);
         }
-        if (changed) InvalidateRect(m_hwnd, nullptr, FALSE);
+
+        // Remove temporary icons for apps that are no longer running
+        for (int i = static_cast<int>(m_icons.size()) - 1; i >= 0; --i)
+        {
+            if (m_icons[i]->IsPinned()) continue;
+            auto it = s_exeCache.find(m_icons[i]->GetPath());
+            std::wstring exe = (it != s_exeCache.end()) ? it->second : L"";
+            if (exe.empty() || running.count(exe) == 0)
+            {
+                m_icons.erase(m_icons.begin() + i);
+                changed = true;
+            }
+        }
+
+        // Add temporary icons for running apps not already in dock
+        for (const auto& [exeName, fullPath] : runningPaths)
+        {
+            if (pinnedExeNames.count(exeName)) continue;
+            // Check if already added as temp icon
+            bool found = false;
+            for (const auto& icon : m_icons)
+                if (!icon->IsPinned())
+                {
+                    auto it = s_exeCache.find(icon->GetPath());
+                    if (it != s_exeCache.end() && it->second == exeName)
+                    { found = true; break; }
+                }
+            if (found) continue;
+
+            // Extract icon and friendly name from the exe path
+            HICON hIcon = FetchJumboIcon(fullPath);
+            if (!hIcon)
+            {
+                SHFILEINFOW sfi = {};
+                if (SHGetFileInfoW(fullPath.c_str(), 0, &sfi, sizeof(sfi),
+                                   SHGFI_ICON | SHGFI_LARGEICON) && sfi.hIcon)
+                    hIcon = sfi.hIcon;
+            }
+            if (!hIcon) continue;
+
+            // Friendly name: strip path and extension
+            std::wstring name = exeName;
+            size_t dot = name.find_last_of(L'.');
+            if (dot != std::wstring::npos) name = name.substr(0, dot);
+            // Capitalize first letter
+            if (!name.empty()) name[0] = towupper(name[0]);
+
+            auto tempIcon = std::make_unique<DockIcon>(fullPath, name, hIcon, nullptr);
+            tempIcon->SetPinned(false);
+            tempIcon->SetRunning(true);
+            s_exeCache[fullPath] = exeName;
+            m_icons.push_back(std::move(tempIcon));
+            changed = true;
+        }
+
+        if (changed) Reposition();
     }
     else if (timerId == TIMER_FLASH_REJECT)
     {

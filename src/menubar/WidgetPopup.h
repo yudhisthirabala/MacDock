@@ -4,6 +4,7 @@
 
 #pragma once
 #include <windows.h>
+#include <gdiplus.h>
 #include <string>
 #include "SystemInfoBar.h"
 #include "../system/CompositionHelper.h"
@@ -44,7 +45,6 @@ private:
     void RenderVolume(Gdiplus::Graphics& g, float s);
     void RenderBattery(Gdiplus::Graphics& g, float s);
     void RenderClock(Gdiplus::Graphics& g, float s);
-
     void OnMouseMove(int x, int y);
     void OnLButtonDown(int x, int y);
     void OnLButtonUp(int x, int y);

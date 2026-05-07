@@ -277,7 +277,7 @@ void WidgetPopup::RenderVolume(Graphics& g, float s)
 
     int pct = static_cast<int>(m_sliderValue * 100.0f + 0.5f);
     std::wstring volText = std::to_wstring(pct) + L"%";
-    RectF textBox(0, 12.0f * s, static_cast<REAL>(m_dcomp.w) - 16.0f * s, 18.0f * s);
+    RectF textBox(0.0f, 12.0f * s, static_cast<REAL>(m_dcomp.w) - 16.0f * s, 18.0f * s);
     StringFormat sf;
     sf.SetAlignment(StringAlignmentFar);
     g.DrawString(volText.c_str(), -1, &bodyFont, textBox, &sf, &dim);
@@ -323,7 +323,7 @@ void WidgetPopup::RenderBattery(Graphics& g, float s)
     if (m_data.battery >= 0)
     {
         std::wstring pctText = std::to_wstring(m_data.battery) + L"%";
-        RectF textBox(0, 12.0f * s, static_cast<REAL>(m_dcomp.w) - 16.0f * s, 18.0f * s);
+        RectF textBox(0.0f, 12.0f * s, static_cast<REAL>(m_dcomp.w) - 16.0f * s, 18.0f * s);
         StringFormat sf;
         sf.SetAlignment(StringAlignmentFar);
         g.DrawString(pctText.c_str(), -1, &bodyFont, textBox, &sf, &fg);
